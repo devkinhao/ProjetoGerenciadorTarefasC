@@ -82,21 +82,21 @@ void GetMemoryUsage(DWORD pid, char *buffer, size_t bufferSize) {
     if (hProcess != NULL) {
         PROCESS_MEMORY_COUNTERS pmc;
         if (GetProcessMemoryInfo(hProcess, &pmc, sizeof(pmc))) {
-            double memoryInMB = (double)pmc.WorkingSetSize / (1024 * 1024);
-            if (memoryInMB < 0.1) {
-                strncpy(buffer, "N/A", bufferSize - 1);
-                buffer[bufferSize - 1] = '\0'; // Garante que a string termine corretamente
+            // Memória física usada (Working Set Size)
+            double workingSetInMB = (double)pmc.WorkingSetSize / (1024 * 1024);
+
+            // Exibe a memória física em MB
+            if (workingSetInMB < 0.1) {
+                snprintf(buffer, bufferSize, "N/A");
             } else {
-                snprintf(buffer, bufferSize, "%.1f MB", memoryInMB);
+                snprintf(buffer, bufferSize, "%.1f MB", workingSetInMB);
             }
         } else {
-            strncpy(buffer, "N/A", bufferSize - 1);
-            buffer[bufferSize - 1] = '\0'; // Garante que a string termine corretamente
+            snprintf(buffer, bufferSize, "N/A");
         }
         CloseHandle(hProcess);
     } else {
-        strncpy(buffer, "N/A", bufferSize - 1);
-        buffer[bufferSize - 1] = '\0'; // Garante que a string termine corretamente
+        snprintf(buffer, bufferSize, "N/A");
     }
 }
 
