@@ -16,8 +16,7 @@ ULONGLONG DiffFileTimes(FILETIME ftA, FILETIME ftB)
     return (b.QuadPart > a.QuadPart) ? (b.QuadPart - a.QuadPart) : 0;
 }
 
-void GetCpuUsage(DWORD pid, char *cpuBuffer, ProcessInfo *procInfo)
-{
+void GetCpuUsage(DWORD pid, char *cpuBuffer, ProcessInfo *procInfo) {
     FILETIME ftCreation, ftExit, ftKernel, ftUser;
     FILETIME sysIdle, sysKernel, sysUser;
 
@@ -60,7 +59,7 @@ void GetCpuUsage(DWORD pid, char *cpuBuffer, ProcessInfo *procInfo)
         int numProcessors = sysInfo.dwNumberOfProcessors;
 
         cpuPercent = (double)(procTotalDiff * 100.0) / (double)sysTotalDiff;
-        // cpuPercent /= numProcessors; // Ajusta pelo número de CPUs
+        
         if (cpuPercent < 0.0)
             cpuPercent = 0.0;
         if (cpuPercent > 100.0)
@@ -74,6 +73,59 @@ void GetCpuUsage(DWORD pid, char *cpuBuffer, ProcessInfo *procInfo)
     memcpy(&procInfo->prevUser, &ftUser, sizeof(FILETIME));
     memcpy(&procInfo->prevSystemKernel, &sysKernel, sizeof(FILETIME));
     memcpy(&procInfo->prevSystemUser, &sysUser, sizeof(FILETIME));
+
+    CloseHandle(hProcess);
+}
+
+void GetMemoryUsage(DWORD pid, char *buffer, size_t bufferSize) {
+    HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pid);
+    if (hProcess != NULL) {
+        PROCESS_MEMORY_COUNTERS pmc;
+        if (GetProcessMemoryInfo(hProcess, &pmc, sizeof(pmc))) {
+            double memoryInMB = (double)pmc.WorkingSetSize / (1024 * 1024);
+            if (memoryInMB < 0.1) {
+                strncpy(buffer, "N/A", bufferSize - 1);
+                buffer[bufferSize - 1] = '\0'; // Garante que a string termine corretamente
+            } else {
+                snprintf(buffer, bufferSize, "%.1f MB", memoryInMB);
+            }
+        } else {
+            strncpy(buffer, "N/A", bufferSize - 1);
+            buffer[bufferSize - 1] = '\0'; // Garante que a string termine corretamente
+        }
+        CloseHandle(hProcess);
+    } else {
+        strncpy(buffer, "N/A", bufferSize - 1);
+        buffer[bufferSize - 1] = '\0'; // Garante que a string termine corretamente
+    }
+}
+
+void GetDiskUsage(DWORD pid, char *diskBuffer, ProcessInfo *procInfo) {
+    HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, pid);
+    if (hProcess == NULL) {
+        strcpy(diskBuffer, "N/A");
+        return;
+    }
+
+    IO_COUNTERS ioCounters;
+    if (GetProcessIoCounters(hProcess, &ioCounters)) {
+        // Calcula a diferença desde a última coleta
+        ULONGLONG readDiff = ioCounters.ReadTransferCount - procInfo->prevReadBytes;
+        ULONGLONG writeDiff = ioCounters.WriteTransferCount - procInfo->prevWriteBytes;
+
+        // Atualiza os valores anteriores
+        procInfo->prevReadBytes = ioCounters.ReadTransferCount;
+        procInfo->prevWriteBytes = ioCounters.WriteTransferCount;
+
+        // Converte para MB/s
+        double readMBps = (double)readDiff / (1024.0 * 1024.0);
+        double writeMBps = (double)writeDiff / (1024.0 * 1024.0);
+
+        // Formata a string final
+        sprintf(diskBuffer, "%.1f MB/s", readMBps + writeMBps);
+    } else {
+        strcpy(diskBuffer, "N/A");
+    }
 
     CloseHandle(hProcess);
 }
@@ -98,7 +150,6 @@ void UpdateProcessList() {
     }
 
     pe32.dwSize = sizeof(PROCESSENTRY32);
-
     int index = 0;
 
     if (Process32First(hProcessSnap, &pe32)) {
@@ -106,7 +157,7 @@ void UpdateProcessList() {
             int processIndex = FindProcessIndex(pe32.th32ProcessID);
 
             if (processIndex == -1) {
-                // New process, add to ListView
+                // Novo processo, adiciona ao ListView
                 lvi.mask = LVIF_TEXT;
                 lvi.iItem = index;
                 lvi.iSubItem = 0;
@@ -119,45 +170,49 @@ void UpdateProcessList() {
                 strcpy(processes[processCount].cpu, "0.0");
                 strcpy(processes[processCount].memory, "N/A");
 
-                // Set columns (PID, STATUS, etc.)
+                // Adiciona PID, STATUS, CPU, MEMÓRIA e DISCO
                 char pidText[16];
                 _itoa(pe32.th32ProcessID, pidText, 10);
                 ListView_SetItemText(hListView, index, 1, pidText);
                 ListView_SetItemText(hListView, index, 2, processes[processCount].status);
                 ListView_SetItemText(hListView, index, 3, processes[processCount].cpu);
-                ListView_SetItemText(hListView, index, 4, processes[processCount].memory);
-                ListView_SetItemText(hListView, index, 5, "N/A"); // Placeholder for GPU
+
+                // Obtém o uso de memória
+                char memBuffer[32];
+                GetMemoryUsage(pe32.th32ProcessID, memBuffer, sizeof(memBuffer));
+                ListView_SetItemText(hListView, index, 4, memBuffer);
+                strcpy(processes[processCount].memory, memBuffer);
+
+                // Obtém o uso de disco
+                char diskBuffer[32];
+                GetDiskUsage(pe32.th32ProcessID, diskBuffer, &processes[processCount]);
+                ListView_SetItemText(hListView, index, 5, diskBuffer);
 
                 processCount++;
             } else {
-                // Existing process, update information
+                // Processo existente, atualizar informações
                 HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pe32.th32ProcessID);
                 if (hProcess != NULL) {
-                    // Update memory usage
-                    PROCESS_MEMORY_COUNTERS pmc;
-                    if (GetProcessMemoryInfo(hProcess, &pmc, sizeof(pmc))) {
-                        char memBuffer[32];
-                        unsigned long memoryInKB = pmc.WorkingSetSize / 1024;
-                        if (memoryInKB == 0) {
-                            strcpy(memBuffer, "N/A");
-                        } else {
-                            sprintf(memBuffer, "%lu K", memoryInKB);
-                        }
-                        ListView_SetItemText(hListView, processIndex, 4, memBuffer);
-                        strcpy(processes[processIndex].memory, memBuffer);
-                    }
+                    // Atualizar uso de memória
+                    char memBuffer[32];
+                    GetMemoryUsage(pe32.th32ProcessID, memBuffer, sizeof(memBuffer));
+                    ListView_SetItemText(hListView, processIndex, 4, memBuffer);
+                    strcpy(processes[processIndex].memory, memBuffer);
 
-                    // Update CPU usage using historical FILETIME
+                    // Atualizar uso de CPU
                     GetCpuUsage(pe32.th32ProcessID, processes[processIndex].cpu, &processes[processIndex]);
                     ListView_SetItemText(hListView, processIndex, 3, processes[processIndex].cpu);
 
-                    // Placeholder for GPU
-                    ListView_SetItemText(hListView, processIndex, 5, "N/A");
+                    // Atualizar uso de Disco
+                    char diskBuffer[16];
+                    GetDiskUsage(pe32.th32ProcessID, diskBuffer, &processes[processIndex]);
+                    strcpy(processes[processIndex].disk, diskBuffer);
+                    ListView_SetItemText(hListView, processIndex, 5, diskBuffer);
 
                     CloseHandle(hProcess);
                 }
 
-                // Update PID and status columns
+                // Atualizar PID e status
                 char pidText[16];
                 _itoa(pe32.th32ProcessID, pidText, 10);
                 ListView_SetItemText(hListView, processIndex, 1, pidText);
@@ -172,8 +227,7 @@ void UpdateProcessList() {
     CloseHandle(hProcessSnap);
 }
 
-void EndSelectedProcess(HWND hListView, HWND hwndParent)
-{
+void EndSelectedProcess(HWND hListView, HWND hwndParent) {
     int selectedIndex = ListView_GetNextItem(hListView, -1, LVNI_SELECTED);
     if (selectedIndex == -1)
     {

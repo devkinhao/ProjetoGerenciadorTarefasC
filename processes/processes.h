@@ -9,14 +9,20 @@ typedef struct {
     char status[32];
     char cpu[16];
     char memory[32];
+    char disk[16]; // Adicionado para armazenar a última medição de disco
     FILETIME prevKernel;
     FILETIME prevUser;
     FILETIME prevSystemKernel;
     FILETIME prevSystemUser;
+    ULONGLONG prevReadBytes;  // 🆕 Bytes lidos na última medição
+    ULONGLONG prevWriteBytes; // 🆕 Bytes escritos na última medição
 } ProcessInfo;
+
 
 ULONGLONG DiffFileTimes(FILETIME ftA, FILETIME ftB);
 void GetCpuUsage(DWORD pid, char *cpuBuffer, ProcessInfo *procInfo);
+void GetMemoryUsage(DWORD pid, char *buffer, size_t bufferSize);
+void GetDiskUsage(DWORD pid, char *diskBuffer, ProcessInfo *procInfo);
 int FindProcessIndex(DWORD pid);
 void UpdateProcessList();
 void EndSelectedProcess(HWND hListView, HWND hwndParent);

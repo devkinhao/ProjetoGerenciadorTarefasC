@@ -29,7 +29,7 @@ void AddListView(HWND hwndParent) {
     LVCOLUMN lvc;
     lvc.mask = LVCF_TEXT | LVCF_WIDTH;
 
-    char* columns[] = { "Process Name", "PID", "Status", "CPU (%)", "Memory (K)", "Disk (%)" };
+    char* columns[] = { "Process Name", "PID", "Status", "CPU (%)", "Memory (MB)", "Disk (%)" };
     int widths[] = { 289, 80, 100, 80, 100, 100 };
 
     for (int i = 0; i < 6; i++) {
