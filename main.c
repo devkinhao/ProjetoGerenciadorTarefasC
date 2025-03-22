@@ -51,23 +51,33 @@ void InitializeSystemInfo() {
     numProcessors = sysInfo.dwNumberOfProcessors;
 }
 
-int main()
-{
+int main() {
     WNDCLASS wc = {0};
     wc.lpfnWndProc = WndProc;
     wc.hInstance = GetModuleHandle(NULL);
     wc.lpszClassName = "TaskManagerClass";
     RegisterClass(&wc);
 
-    // Criando a janela
-    HWND hwnd = CreateWindow(wc.lpszClassName, "Task Manager", WS_OVERLAPPEDWINDOW,
-                             CW_USEDEFAULT, CW_USEDEFAULT, WINDOW_WIDTH, WINDOW_HEIGHT, NULL, NULL, wc.hInstance, NULL);
+    HWND hwnd = CreateWindow(wc.lpszClassName, "Task Manager", 
+        WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX, // Remover WS_MAXIMIZEBOX aqui
+        CW_USEDEFAULT, CW_USEDEFAULT, 
+        WINDOW_WIDTH, WINDOW_HEIGHT, 
+        NULL, NULL, wc.hInstance, NULL);
 
     if (!hwnd)
     {
         MessageBox(NULL, "Erro ao criar a janela!", "Erro", MB_ICONERROR | MB_OK);
         return 1;
     }
+
+    // Remover o botão de maximizar (WS_MAXIMIZEBOX) após a criação da janela
+    LONG_PTR style = GetWindowLongPtr(hwnd, GWL_STYLE);
+    style &= ~WS_MAXIMIZEBOX;  // Remove o botão de maximizar
+    style &= ~WS_SIZEBOX;      // Remove o redimensionamento
+    SetWindowLongPtr(hwnd, GWL_STYLE, style);
+
+    // Definir a posição e tamanho fixos da janela
+    SetWindowPos(hwnd, NULL, CW_USEDEFAULT, CW_USEDEFAULT, WINDOW_WIDTH, WINDOW_HEIGHT, SWP_NOZORDER | SWP_NOMOVE);
 
     InitializeSystemInfo();
     // Centraliza a janela
