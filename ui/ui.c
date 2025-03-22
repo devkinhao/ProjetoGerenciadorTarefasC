@@ -56,8 +56,16 @@ void SetupTimer(HWND hwnd) {
 }
 
 void OnTabSelectionChanged(HWND hwndParent, int selectedTab) {
+    // Ocultar ou mostrar a lista de processos e o painel de hardware
     ShowWindow(hListView, selectedTab == 0 ? SW_SHOW : SW_HIDE);
     ShowWindow(hHardwarePanel, selectedTab == 1 ? SW_SHOW : SW_HIDE);
+    
+    // Ocultar o botão End Task se não estiver na aba de processos (supondo que a aba de processos é 0)
+    if (selectedTab == 0) {
+        ShowWindow(hButtonEndTask, SW_SHOW); // Mostrar o botão na aba de processos
+    } else {
+        ShowWindow(hButtonEndTask, SW_HIDE); // Esconder o botão nas outras abas
+    }
 }
 
 void CleanupResources() {
