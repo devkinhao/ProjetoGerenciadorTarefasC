@@ -1,7 +1,10 @@
 #include "processes.h"
+#include <stdbool.h>
 
 static FILETIME prevProcessKernel = {0}, prevProcessUser = {0};
 static FILETIME prevSystemKernel = {0}, prevSystemUser = {0};
+
+#define MAX_PROCESSES 1024
 
 ProcessInfo processes[1024];
 int processCount = 0;
@@ -185,6 +188,7 @@ void UpdateProcessList() {
 
     pe32.dwSize = sizeof(PROCESSENTRY32);
     int index = 0;
+    bool processExists[MAX_PROCESSES] = {false}; // Array para rastrear processos ativos
 
     if (Process32First(hProcessSnap, &pe32)) {
         do {
@@ -201,7 +205,7 @@ void UpdateProcessList() {
                 processes[processCount].pid = pe32.th32ProcessID;
                 strcpy(processes[processCount].name, pe32.szExeFile);
                 strcpy(processes[processCount].status, "Running");
-                strcpy(processes[processCount].cpu, "0.0");
+                strcpy(processes[processCount].cpu, "N/A");
                 strcpy(processes[processCount].memory, "N/A");
 
                 // Adiciona User
@@ -227,9 +231,11 @@ void UpdateProcessList() {
                 GetDiskUsage(pe32.th32ProcessID, diskBuffer, &processes[processCount]);
                 ListView_SetItemText(hListView, index, 6, diskBuffer);
 
+                processExists[processCount] = true;
                 processCount++;
             } else {
                 // Processo existente, atualizar informações
+                processExists[processIndex] = true;
                 HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pe32.th32ProcessID);
                 if (hProcess != NULL) {
                     // Atualizar uso de memória
@@ -261,6 +267,18 @@ void UpdateProcessList() {
 
             index++;
         } while (Process32Next(hProcessSnap, &pe32));
+    }
+
+    // Remover processos que não existem mais
+    for (int i = 0; i < processCount; i++) {
+        if (!processExists[i]) {
+            ListView_DeleteItem(hListView, i);
+            for (int j = i; j < processCount - 1; j++) {
+                processes[j] = processes[j + 1];
+            }
+            processCount--;
+            i--; // Ajustar índice após remoção
+        }
     }
 
     CloseHandle(hProcessSnap);
