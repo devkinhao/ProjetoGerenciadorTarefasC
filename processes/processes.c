@@ -276,7 +276,7 @@ void EndSelectedProcess(HWND hListView, HWND hwndParent) {
 
     char pidText[16];
     LVITEM item = {0};
-    item.iSubItem = 1;
+    item.iSubItem = 2;
     item.iItem = selectedIndex;
     item.mask = LVIF_TEXT;
     item.pszText = pidText;
