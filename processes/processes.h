@@ -24,6 +24,7 @@ void GetCpuUsage(DWORD pid, char *cpuBuffer, ProcessInfo *procInfo);
 void GetMemoryUsage(DWORD pid, char *buffer, size_t bufferSize);
 void GetDiskUsage(DWORD pid, char *diskBuffer, ProcessInfo *procInfo);
 int FindProcessIndex(DWORD pid);
+void GetProcessUser(DWORD processID, char* userBuffer, DWORD bufferSize);
 void UpdateProcessList();
 void EndSelectedProcess(HWND hListView, HWND hwndParent);
 

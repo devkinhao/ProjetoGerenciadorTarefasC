@@ -29,10 +29,11 @@ void AddListView(HWND hwndParent) {
     LVCOLUMN lvc;
     lvc.mask = LVCF_TEXT | LVCF_WIDTH;
 
-    char* columns[] = { "Process Name", "PID", "Status", "CPU (%)", "Memory (MB)", "Disk (%)" };
-    int widths[] = { 289, 80, 100, 80, 100, 100 };
+    // Agora temos 7 colunas
+    char* columns[] = { "Process Name", "User", "PID", "Status", "CPU (%)", "Memory (MB)", "Disk (%)" };
+    int widths[] = { 200, 99, 70, 100, 80, 100, 100 };
 
-    for (int i = 0; i < 6; i++) {
+    for (int i = 0; i < 7; i++) {
         lvc.pszText = columns[i];
         lvc.cx = widths[i];
         ListView_InsertColumn(hListView, i, &lvc);

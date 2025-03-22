@@ -139,6 +139,40 @@ int FindProcessIndex(DWORD pid) {
     return -1;
 }
 
+void GetProcessUser(DWORD processID, char* userBuffer, DWORD bufferSize) {
+    HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, processID);
+    if (hProcess == NULL) {
+        strcpy(userBuffer, "Unknown");
+        return;
+    }
+
+    HANDLE hToken;
+    if (OpenProcessToken(hProcess, TOKEN_QUERY, &hToken)) {
+        DWORD dwSize;
+        GetTokenInformation(hToken, TokenUser, NULL, 0, &dwSize);
+        PTOKEN_USER pTokenUser = (PTOKEN_USER)malloc(dwSize);
+        if (GetTokenInformation(hToken, TokenUser, pTokenUser, dwSize, &dwSize)) {
+            SID_NAME_USE snu;
+            char name[256];
+            DWORD nameSize = 256;
+            char domain[256];
+            DWORD domainSize = 256;
+
+            // Tenta obter o nome de usuário e o nome do domínio
+            if (LookupAccountSid(NULL, pTokenUser->User.Sid, name, &nameSize, domain, &domainSize, &snu)) {
+                // Apenas exibe o nome do usuário, sem o domínio
+                snprintf(userBuffer, bufferSize, "%s", name);
+            } else {
+                strcpy(userBuffer, "Unknown");
+            }
+        }
+        free(pTokenUser);
+        CloseHandle(hToken);
+    }
+
+    CloseHandle(hProcess);
+}
+
 void UpdateProcessList() {
     HANDLE hProcessSnap;
     PROCESSENTRY32 pe32;
@@ -170,23 +204,28 @@ void UpdateProcessList() {
                 strcpy(processes[processCount].cpu, "0.0");
                 strcpy(processes[processCount].memory, "N/A");
 
+                // Adiciona User
+                char user[64];
+                GetProcessUser(pe32.th32ProcessID, user, sizeof(user)); // Implemente a função GetProcessUser
+                ListView_SetItemText(hListView, index, 1, user);
+
                 // Adiciona PID, STATUS, CPU, MEMÓRIA e DISCO
                 char pidText[16];
                 _itoa(pe32.th32ProcessID, pidText, 10);
-                ListView_SetItemText(hListView, index, 1, pidText);
-                ListView_SetItemText(hListView, index, 2, processes[processCount].status);
-                ListView_SetItemText(hListView, index, 3, processes[processCount].cpu);
+                ListView_SetItemText(hListView, index, 2, pidText);
+                ListView_SetItemText(hListView, index, 3, processes[processCount].status);
+                ListView_SetItemText(hListView, index, 4, processes[processCount].cpu);
 
                 // Obtém o uso de memória
                 char memBuffer[32];
                 GetMemoryUsage(pe32.th32ProcessID, memBuffer, sizeof(memBuffer));
-                ListView_SetItemText(hListView, index, 4, memBuffer);
+                ListView_SetItemText(hListView, index, 5, memBuffer);
                 strcpy(processes[processCount].memory, memBuffer);
 
                 // Obtém o uso de disco
                 char diskBuffer[32];
                 GetDiskUsage(pe32.th32ProcessID, diskBuffer, &processes[processCount]);
-                ListView_SetItemText(hListView, index, 5, diskBuffer);
+                ListView_SetItemText(hListView, index, 6, diskBuffer);
 
                 processCount++;
             } else {
@@ -196,18 +235,18 @@ void UpdateProcessList() {
                     // Atualizar uso de memória
                     char memBuffer[32];
                     GetMemoryUsage(pe32.th32ProcessID, memBuffer, sizeof(memBuffer));
-                    ListView_SetItemText(hListView, processIndex, 4, memBuffer);
+                    ListView_SetItemText(hListView, processIndex, 5, memBuffer);
                     strcpy(processes[processIndex].memory, memBuffer);
 
                     // Atualizar uso de CPU
                     GetCpuUsage(pe32.th32ProcessID, processes[processIndex].cpu, &processes[processIndex]);
-                    ListView_SetItemText(hListView, processIndex, 3, processes[processIndex].cpu);
+                    ListView_SetItemText(hListView, processIndex, 4, processes[processIndex].cpu);
 
                     // Atualizar uso de Disco
                     char diskBuffer[16];
                     GetDiskUsage(pe32.th32ProcessID, diskBuffer, &processes[processIndex]);
                     strcpy(processes[processIndex].disk, diskBuffer);
-                    ListView_SetItemText(hListView, processIndex, 5, diskBuffer);
+                    ListView_SetItemText(hListView, processIndex, 6, diskBuffer);
 
                     CloseHandle(hProcess);
                 }
@@ -215,9 +254,9 @@ void UpdateProcessList() {
                 // Atualizar PID e status
                 char pidText[16];
                 _itoa(pe32.th32ProcessID, pidText, 10);
-                ListView_SetItemText(hListView, processIndex, 1, pidText);
+                ListView_SetItemText(hListView, processIndex, 2, pidText);
                 strcpy(processes[processIndex].status, "Running");
-                ListView_SetItemText(hListView, processIndex, 2, processes[processIndex].status);
+                ListView_SetItemText(hListView, processIndex, 3, processes[processIndex].status);
             }
 
             index++;
