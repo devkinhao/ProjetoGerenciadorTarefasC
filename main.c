@@ -46,6 +46,20 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
     return 0;
 }
 
+void EnableDebugPrivilege() {
+    HANDLE hToken;
+    TOKEN_PRIVILEGES tp;
+    
+    if (OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &hToken)) {
+        LookupPrivilegeValue(NULL, SE_DEBUG_NAME, &tp.Privileges[0].Luid);
+        tp.PrivilegeCount = 1;
+        tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+
+        AdjustTokenPrivileges(hToken, FALSE, &tp, sizeof(tp), NULL, NULL);
+        CloseHandle(hToken);
+    }
+}
+
 void InitializeSystemInfo() {
     GetSystemInfo(&sysInfo);
     numProcessors = sysInfo.dwNumberOfProcessors;
@@ -78,6 +92,9 @@ int main() {
 
     // Definir a posição e tamanho fixos da janela
     SetWindowPos(hwnd, NULL, CW_USEDEFAULT, CW_USEDEFAULT, WINDOW_WIDTH, WINDOW_HEIGHT, SWP_NOZORDER | SWP_NOMOVE);
+
+    // Ativa a permissão de depuração para acessar processos do SYSTEM
+    EnableDebugPrivilege();
 
     InitializeSystemInfo();
     // Centraliza a janela
