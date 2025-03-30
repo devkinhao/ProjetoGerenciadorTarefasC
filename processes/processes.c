@@ -1,5 +1,4 @@
 #include "processes.h"
-#include <stdbool.h>
 
 static FILETIME prevProcessKernel = {0}, prevProcessUser = {0};
 static FILETIME prevSystemKernel = {0}, prevSystemUser = {0};
@@ -176,6 +175,19 @@ void GetProcessUser(DWORD processID, char* userBuffer, DWORD bufferSize) {
     CloseHandle(hProcess);
 }
 
+void RemoveNonExistingProcesses(bool processExists[]) {
+    for (int i = 0; i < processCount; i++) {
+        if (!processExists[i]) {
+            ListView_DeleteItem(hListView, i);
+            for (int j = i; j < processCount - 1; j++) {
+                processes[j] = processes[j + 1];
+            }
+            processCount--;
+            i--; // Ajustar índice após remoção
+        }
+    }
+}
+
 void UpdateProcessList() {
     HANDLE hProcessSnap;
     PROCESSENTRY32 pe32;
@@ -270,16 +282,7 @@ void UpdateProcessList() {
     }
 
     // Remover processos que não existem mais
-    for (int i = 0; i < processCount; i++) {
-        if (!processExists[i]) {
-            ListView_DeleteItem(hListView, i);
-            for (int j = i; j < processCount - 1; j++) {
-                processes[j] = processes[j + 1];
-            }
-            processCount--;
-            i--; // Ajustar índice após remoção
-        }
-    }
+    RemoveNonExistingProcesses(processExists);
 
     CloseHandle(hProcessSnap);
 }
