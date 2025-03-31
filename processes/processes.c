@@ -23,28 +23,26 @@ void GetCpuUsage(DWORD pid, char *cpuBuffer, ProcessInfo *procInfo) {
     FILETIME sysIdle, sysKernel, sysUser;
 
     HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pid);
-    if (hProcess == NULL)
-    {
-        strcpy(cpuBuffer, "0.0");
+    if (hProcess == NULL) {
+        strcpy(cpuBuffer, "0.0%");
         return;
     }
 
     // Obtém o tempo total do sistema (para cálculo da base)
-    if (!GetSystemTimes(&sysIdle, &sysKernel, &sysUser))
-    {
+    if (!GetSystemTimes(&sysIdle, &sysKernel, &sysUser)) {
         CloseHandle(hProcess);
-        strcpy(cpuBuffer, "0.0");
+        strcpy(cpuBuffer, "0.0%");
         return;
     }
 
     // Obtém os tempos do processo
-    if (!GetProcessTimes(hProcess, &ftCreation, &ftExit, &ftKernel, &ftUser))
-    {
+    if (!GetProcessTimes(hProcess, &ftCreation, &ftExit, &ftKernel, &ftUser)) {
         CloseHandle(hProcess);
-        strcpy(cpuBuffer, "0.0");
+        strcpy(cpuBuffer, "0.0%");
         return;
     }
 
+    // Calcula a diferença de tempo entre duas medições
     ULONGLONG sysKernelDiff = DiffFileTimes(procInfo->prevSystemKernel, sysKernel);
     ULONGLONG sysUserDiff = DiffFileTimes(procInfo->prevSystemUser, sysUser);
     ULONGLONG sysTotalDiff = sysKernelDiff + sysUserDiff;
@@ -54,19 +52,13 @@ void GetCpuUsage(DWORD pid, char *cpuBuffer, ProcessInfo *procInfo) {
     ULONGLONG procTotalDiff = procKernelDiff + procUserDiff;
 
     double cpuPercent = 0.0;
-    if (sysTotalDiff > 0)
-    {
-        SYSTEM_INFO sysInfo;
-        GetSystemInfo(&sysInfo);
-        int numProcessors = sysInfo.dwNumberOfProcessors;
-
-        cpuPercent = (double)(procTotalDiff * 100.0) / (double)sysTotalDiff;
-        
-        if (cpuPercent < 0.0)
-            cpuPercent = 0.0;
-        if (cpuPercent > 100.0)
-            cpuPercent = 100.0; // Limita a 100%
+    if (sysTotalDiff > 0) {
+        cpuPercent = ((double)procTotalDiff / sysTotalDiff) * 100.0;
     }
+
+    // Evita valores negativos
+    if (cpuPercent < 0.0) cpuPercent = 0.0;
+    if (cpuPercent > 100.0) cpuPercent = 100.0; // Mantém no limite do Task Manager
 
     sprintf(cpuBuffer, "%.1f%%", cpuPercent);
 
