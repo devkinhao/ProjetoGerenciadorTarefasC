@@ -5,11 +5,10 @@ static FILETIME prevSystemKernel = {0}, prevSystemUser = {0};
 
 #define MAX_PROCESSES 1024
 
-ProcessInfo processes[1024];
+ProcessInfo processes[MAX_PROCESSES];
 int processCount = 0;
 
-ULONGLONG DiffFileTimes(FILETIME ftA, FILETIME ftB)
-{
+ULONGLONG DiffFileTimes(FILETIME ftA, FILETIME ftB) {
     ULARGE_INTEGER a, b;
     a.LowPart = ftA.dwLowDateTime;
     a.HighPart = ftA.dwHighDateTime;
@@ -18,31 +17,25 @@ ULONGLONG DiffFileTimes(FILETIME ftA, FILETIME ftB)
     return (b.QuadPart > a.QuadPart) ? (b.QuadPart - a.QuadPart) : 0;
 }
 
-void GetCpuUsage(DWORD pid, char *cpuBuffer, ProcessInfo *procInfo) {
-    FILETIME ftCreation, ftExit, ftKernel, ftUser;
-    FILETIME sysIdle, sysKernel, sysUser;
-
-    HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pid);
+void GetCpuUsage(HANDLE hProcess, char *cpuBuffer, ProcessInfo *procInfo) {
     if (hProcess == NULL) {
         strcpy(cpuBuffer, "0.0%");
         return;
     }
 
-    // Obtém o tempo total do sistema (para cálculo da base)
+    FILETIME ftCreation, ftExit, ftKernel, ftUser;
+    FILETIME sysIdle, sysKernel, sysUser;
+
     if (!GetSystemTimes(&sysIdle, &sysKernel, &sysUser)) {
-        CloseHandle(hProcess);
         strcpy(cpuBuffer, "0.0%");
         return;
     }
 
-    // Obtém os tempos do processo
     if (!GetProcessTimes(hProcess, &ftCreation, &ftExit, &ftKernel, &ftUser)) {
-        CloseHandle(hProcess);
         strcpy(cpuBuffer, "0.0%");
         return;
     }
 
-    // Calcula a diferença de tempo entre duas medições
     ULONGLONG sysKernelDiff = DiffFileTimes(procInfo->prevSystemKernel, sysKernel);
     ULONGLONG sysUserDiff = DiffFileTimes(procInfo->prevSystemUser, sysUser);
     ULONGLONG sysTotalDiff = sysKernelDiff + sysUserDiff;
@@ -56,30 +49,23 @@ void GetCpuUsage(DWORD pid, char *cpuBuffer, ProcessInfo *procInfo) {
         cpuPercent = ((double)procTotalDiff / sysTotalDiff) * 100.0;
     }
 
-    // Evita valores negativos
     if (cpuPercent < 0.0) cpuPercent = 0.0;
-    if (cpuPercent > 100.0) cpuPercent = 100.0; // Mantém no limite do Task Manager
+    if (cpuPercent > 100.0) cpuPercent = 100.0;
 
     sprintf(cpuBuffer, "%.1f%%", cpuPercent);
 
-    // Atualiza os valores anteriores para a próxima medição
     memcpy(&procInfo->prevKernel, &ftKernel, sizeof(FILETIME));
     memcpy(&procInfo->prevUser, &ftUser, sizeof(FILETIME));
     memcpy(&procInfo->prevSystemKernel, &sysKernel, sizeof(FILETIME));
     memcpy(&procInfo->prevSystemUser, &sysUser, sizeof(FILETIME));
-
-    CloseHandle(hProcess);
 }
 
-void GetMemoryUsage(DWORD pid, char *buffer, size_t bufferSize) {
-    HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pid);
+void GetMemoryUsage(HANDLE hProcess, char *buffer, size_t bufferSize) {
     if (hProcess != NULL) {
         PROCESS_MEMORY_COUNTERS pmc;
         if (GetProcessMemoryInfo(hProcess, &pmc, sizeof(pmc))) {
-            // Memória física usada (Working Set Size)
             double workingSetInMB = (double)pmc.WorkingSetSize / (1024 * 1024);
 
-            // Exibe a memória física em MB
             if (workingSetInMB < 0.1) {
                 snprintf(buffer, bufferSize, "N/A");
             } else {
@@ -88,14 +74,12 @@ void GetMemoryUsage(DWORD pid, char *buffer, size_t bufferSize) {
         } else {
             snprintf(buffer, bufferSize, "N/A");
         }
-        CloseHandle(hProcess);
     } else {
         snprintf(buffer, bufferSize, "N/A");
     }
 }
 
-void GetDiskUsage(DWORD pid, char *diskBuffer, ProcessInfo *procInfo) {
-    HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, pid);
+void GetDiskUsage(HANDLE hProcess, char *diskBuffer, ProcessInfo *procInfo) {
     if (hProcess == NULL) {
         strcpy(diskBuffer, "N/A");
         return;
@@ -103,25 +87,19 @@ void GetDiskUsage(DWORD pid, char *diskBuffer, ProcessInfo *procInfo) {
 
     IO_COUNTERS ioCounters;
     if (GetProcessIoCounters(hProcess, &ioCounters)) {
-        // Calcula a diferença desde a última coleta
         ULONGLONG readDiff = ioCounters.ReadTransferCount - procInfo->prevReadBytes;
         ULONGLONG writeDiff = ioCounters.WriteTransferCount - procInfo->prevWriteBytes;
 
-        // Atualiza os valores anteriores
         procInfo->prevReadBytes = ioCounters.ReadTransferCount;
         procInfo->prevWriteBytes = ioCounters.WriteTransferCount;
 
-        // Converte para MB/s
         double readMBps = (double)readDiff / (1024.0 * 1024.0);
         double writeMBps = (double)writeDiff / (1024.0 * 1024.0);
 
-        // Formata a string final
         sprintf(diskBuffer, "%.1f MB/s", readMBps + writeMBps);
     } else {
         strcpy(diskBuffer, "N/A");
     }
-
-    CloseHandle(hProcess);
 }
 
 int FindProcessIndex(DWORD pid) {
@@ -133,8 +111,7 @@ int FindProcessIndex(DWORD pid) {
     return -1;
 }
 
-void GetProcessUser(DWORD processID, char* userBuffer, DWORD bufferSize) {
-    HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, processID);
+void GetProcessUser(HANDLE hProcess, char* userBuffer, DWORD bufferSize) {
     if (hProcess == NULL) {
         strcpy(userBuffer, "Unknown");
         return;
@@ -145,57 +122,51 @@ void GetProcessUser(DWORD processID, char* userBuffer, DWORD bufferSize) {
         DWORD dwSize;
         GetTokenInformation(hToken, TokenUser, NULL, 0, &dwSize);
         PTOKEN_USER pTokenUser = (PTOKEN_USER)malloc(dwSize);
-        if (GetTokenInformation(hToken, TokenUser, pTokenUser, dwSize, &dwSize)) {
-            SID_NAME_USE snu;
-            char name[256];
-            DWORD nameSize = 256;
-            char domain[256];
-            DWORD domainSize = 256;
+        if (pTokenUser != NULL) {
+            if (GetTokenInformation(hToken, TokenUser, pTokenUser, dwSize, &dwSize)) {
+                SID_NAME_USE snu;
+                char name[256];
+                DWORD nameSize = 256;
+                char domain[256];
+                DWORD domainSize = 256;
 
-            // Tenta obter o nome de usuário e o nome do domínio
-            if (LookupAccountSid(NULL, pTokenUser->User.Sid, name, &nameSize, domain, &domainSize, &snu)) {
-                // Apenas exibe o nome do usuário, sem o domínio
-                snprintf(userBuffer, bufferSize, "%s", name);
-            } else {
-                strcpy(userBuffer, "Unknown");
+                if (LookupAccountSid(NULL, pTokenUser->User.Sid, name, &nameSize, domain, &domainSize, &snu)) {
+                    snprintf(userBuffer, bufferSize, "%s", name);
+                } else {
+                    strcpy(userBuffer, "Unknown");
+                }
             }
+            free(pTokenUser);
         }
-        free(pTokenUser);
         CloseHandle(hToken);
+    } else {
+        strcpy(userBuffer, "Unknown");
     }
-
-    CloseHandle(hProcess);
 }
 
-void UpdateProcessInfo(int processIndex, PROCESSENTRY32 pe32) {
-    // Buffers para armazenar as informações
-    char user[64], pidText[16];
+void UpdateProcessInfo(int processIndex, HANDLE hProcess) {
+    char user[64] = "Unknown";
+    char pidText[16];
 
-    // Atualiza as colunas de nome, PID e status
-    GetProcessUser(pe32.th32ProcessID, user, sizeof(user)); 
-    _itoa(pe32.th32ProcessID, pidText, 10);
+    GetProcessUser(hProcess, user, sizeof(user));
+    _itoa(processes[processIndex].pid, pidText, 10);
 
-    // Atualiza a interface
     ListView_SetItemText(hListView, processIndex, 1, user);
     ListView_SetItemText(hListView, processIndex, 2, pidText);
-    ListView_SetItemText(hListView, processIndex, 3, "Running"); 
+    ListView_SetItemText(hListView, processIndex, 3, "Running");
 }
 
-void UpdateProcessMetrics(int processIndex, DWORD processID) {
-    // Buffers para armazenar as informações
+void UpdateProcessMetrics(int processIndex, HANDLE hProcess) {
     char memBuffer[32], cpuBuffer[32], diskBuffer[32];
 
-    // Atualizar informações de memória, CPU e disco
-    GetMemoryUsage(processID, memBuffer, sizeof(memBuffer));
-    GetCpuUsage(processID, cpuBuffer, &processes[processIndex]);
-    GetDiskUsage(processID, diskBuffer, &processes[processIndex]);
+    GetMemoryUsage(hProcess, memBuffer, sizeof(memBuffer));
+    GetCpuUsage(hProcess, cpuBuffer, &processes[processIndex]);
+    GetDiskUsage(hProcess, diskBuffer, &processes[processIndex]);
 
-    // Atualiza as informações na interface de forma eficiente
     ListView_SetItemText(hListView, processIndex, 5, memBuffer);
     ListView_SetItemText(hListView, processIndex, 4, cpuBuffer);
     ListView_SetItemText(hListView, processIndex, 6, diskBuffer);
 
-    // Atualiza os dados no array de processos
     strcpy(processes[processIndex].memory, memBuffer);
     strcpy(processes[processIndex].cpu, cpuBuffer);
     strcpy(processes[processIndex].disk, diskBuffer);
@@ -209,7 +180,7 @@ void RemoveNonExistingProcesses(bool processExists[]) {
                 processes[j] = processes[j + 1];
             }
             processCount--;
-            i--; // Ajustar índice após remoção
+            i--;
         }
     }
 }
@@ -218,7 +189,7 @@ void UpdateProcessList() {
     HANDLE hProcessSnap;
     PROCESSENTRY32 pe32;
     LVITEM lvi;
-    bool processExists[MAX_PROCESSES] = {false}; // Array para rastrear processos ativos
+    bool processExists[MAX_PROCESSES] = {false};
 
     hProcessSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
     if (hProcessSnap == INVALID_HANDLE_VALUE) {
@@ -233,48 +204,52 @@ void UpdateProcessList() {
             int processIndex = FindProcessIndex(pe32.th32ProcessID);
 
             if (processIndex == -1) {
-                // Novo processo, adiciona ao ListView
+                if (processCount >= MAX_PROCESSES) {
+                    break;
+                }
+
                 lvi.mask = LVIF_TEXT;
                 lvi.iItem = index;
                 lvi.iSubItem = 0;
                 lvi.pszText = pe32.szExeFile;
                 ListView_InsertItem(hListView, &lvi);
 
-                // Adiciona dados do processo
                 processes[processCount].pid = pe32.th32ProcessID;
                 strcpy(processes[processCount].name, pe32.szExeFile);
                 strcpy(processes[processCount].status, "Running");
                 strcpy(processes[processCount].cpu, "N/A");
                 strcpy(processes[processCount].memory, "N/A");
 
-                // Chama a função para atualizar as colunas de nome, PID, usuário e status
-                UpdateProcessInfo(processCount, pe32);
-
-                // Chama a função para atualizar métricas de memória, CPU e disco
-                UpdateProcessMetrics(processCount, pe32.th32ProcessID);
+                HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pe32.th32ProcessID);
+                if (hProcess != NULL) {
+                    UpdateProcessInfo(processCount, hProcess);
+                    UpdateProcessMetrics(processCount, hProcess);
+                    CloseHandle(hProcess);
+                } else {
+                    char user[64] = "Unknown", pidText[16];
+                    _itoa(pe32.th32ProcessID, pidText, 10);
+                    ListView_SetItemText(hListView, processCount, 1, user);
+                    ListView_SetItemText(hListView, processCount, 2, pidText);
+                    ListView_SetItemText(hListView, processCount, 3, "Access Denied");
+                }
 
                 processExists[processCount] = true;
                 processCount++;
             } else {
-                // Processo existente, atualiza informações
                 processExists[processIndex] = true;
+
                 HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pe32.th32ProcessID);
                 if (hProcess != NULL) {
-                    // Atualiza as métricas de memória, CPU e disco
-                    UpdateProcessMetrics(processIndex, pe32.th32ProcessID);
-
+                    UpdateProcessInfo(processIndex, hProcess);
+                    UpdateProcessMetrics(processIndex, hProcess);
                     CloseHandle(hProcess);
                 }
-
-                // Atualiza as colunas de nome, PID, usuário e status
-                UpdateProcessInfo(processIndex, pe32);
             }
 
             index++;
         } while (Process32Next(hProcessSnap, &pe32));
     }
 
-    // Remover processos que não existem mais
     RemoveNonExistingProcesses(processExists);
 
     CloseHandle(hProcessSnap);

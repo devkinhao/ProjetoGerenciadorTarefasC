@@ -10,24 +10,23 @@ typedef struct {
     char status[32];
     char cpu[16];
     char memory[32];
-    char disk[16]; // Adicionado para armazenar a última medição de disco
+    char disk[16];
     FILETIME prevKernel;
     FILETIME prevUser;
     FILETIME prevSystemKernel;
     FILETIME prevSystemUser;
-    ULONGLONG prevReadBytes;  // 🆕 Bytes lidos na última medição
-    ULONGLONG prevWriteBytes; // 🆕 Bytes escritos na última medição
+    ULONGLONG prevReadBytes;
+    ULONGLONG prevWriteBytes;
 } ProcessInfo;
 
-
 ULONGLONG DiffFileTimes(FILETIME ftA, FILETIME ftB);
-void GetCpuUsage(DWORD pid, char *cpuBuffer, ProcessInfo *procInfo);
-void GetMemoryUsage(DWORD pid, char *buffer, size_t bufferSize);
-void GetDiskUsage(DWORD pid, char *diskBuffer, ProcessInfo *procInfo);
+void GetCpuUsage(HANDLE hProcess, char *cpuBuffer, ProcessInfo *procInfo);
+void GetMemoryUsage(HANDLE hProcess, char *buffer, size_t bufferSize);
+void GetDiskUsage(HANDLE hProcess, char *diskBuffer, ProcessInfo *procInfo);
 int FindProcessIndex(DWORD pid);
-void GetProcessUser(DWORD processID, char* userBuffer, DWORD bufferSize);
-void UpdateProcessInfo(int processIndex, PROCESSENTRY32 pe32);
-void UpdateProcessMetrics(int processIndex, DWORD processID);
+void GetProcessUser(HANDLE hProcess, char* userBuffer, DWORD bufferSize);
+void UpdateProcessInfo(int processIndex, HANDLE hProcess);
+void UpdateProcessMetrics(int processIndex, HANDLE hProcess);
 void RemoveNonExistingProcesses(bool processExists[]);
 void UpdateProcessList();
 void EndSelectedProcess(HWND hListView, HWND hwndParent);
