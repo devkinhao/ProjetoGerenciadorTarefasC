@@ -11,6 +11,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
     case WM_CREATE:
         AddTabs(hwnd);
         AddListView(hwnd);
+        AddHardwarePanel(hwnd);
         AddFooter(hwnd);
         SetupTimer(hwnd);
         break;
@@ -25,8 +26,11 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
     case WM_TIMER:
         UpdateProcessList();
+        if (TabCtrl_GetCurSel(hTab) == 1) { // Se estiver na aba de Hardware
+            UpdateHardwareInfo();
+        }
         break;
-
+    
     case WM_COMMAND:
         if (LOWORD(wParam) == ID_END_TASK_BUTTON)
         {

@@ -1,5 +1,6 @@
 #include "ui.h"
 #include "../utils\utils.h"
+#include "..\\hardware\\hardware.h"
 
 void AddTabs(HWND hwndParent) {
     hTab = CreateWindowEx(0, WC_TABCONTROL, "",
@@ -30,7 +31,7 @@ void AddListView(HWND hwndParent) {
     lvc.mask = LVCF_TEXT | LVCF_WIDTH;
 
     // Agora temos 7 colunas
-    char* columns[] = { "Process Name", "User", "PID", "Status", "CPU (%)", "Memory (MB)", "Disk (%)" };
+    char* columns[] = { "Process Name", "User", "PID", "Status", "CPU (%)", "Memory (MB)", "Disk (MB/s)" };
     int widths[] = { 200, 99, 70, 100, 80, 100, 100 };
 
     for (int i = 0; i < 7; i++) {
@@ -52,19 +53,18 @@ void AddFooter(HWND hwndParent) {
 }
 
 void SetupTimer(HWND hwnd) {
-    SetTimer(hwnd, 1, 500, NULL);
+    SetTimer(hwnd, 1, 1000, NULL);
 }
 
 void OnTabSelectionChanged(HWND hwndParent, int selectedTab) {
-    // Ocultar ou mostrar a lista de processos e o painel de hardware
     ShowWindow(hListView, selectedTab == 0 ? SW_SHOW : SW_HIDE);
     ShowWindow(hHardwarePanel, selectedTab == 1 ? SW_SHOW : SW_HIDE);
-    
-    // Ocultar o botão End Task se não estiver na aba de processos (supondo que a aba de processos é 0)
+
     if (selectedTab == 0) {
-        ShowWindow(hButtonEndTask, SW_SHOW); // Mostrar o botão na aba de processos
+        ShowWindow(hButtonEndTask, SW_SHOW);
     } else {
-        ShowWindow(hButtonEndTask, SW_HIDE); // Esconder o botão nas outras abas
+        ShowWindow(hButtonEndTask, SW_HIDE);
+        UpdateHardwareInfo(); // <- Atualiza info quando mudar para a aba 1 (Hardware)
     }
 }
 
