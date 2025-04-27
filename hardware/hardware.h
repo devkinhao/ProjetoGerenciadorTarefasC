@@ -4,7 +4,6 @@
 #include "..\config.h"
 
 // Declaracoes de funcoes para a aba Hardware
-void GetDiskModel(char* diskModel, size_t size);
 void AddHardwarePanel(HWND hwndParent);
 void UpdateHardwareInfo(void);
 
