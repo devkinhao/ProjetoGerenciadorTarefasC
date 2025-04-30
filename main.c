@@ -30,6 +30,15 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             UpdateHardwareInfo();
         }
         break;
+
+    case WM_CONTEXTMENU:
+        if ((HWND)wParam == hListView) {
+            POINT pt;
+            pt.x = LOWORD(lParam);
+            pt.y = HIWORD(lParam);
+            ShowContextMenu(hListView, hwnd, pt);
+        }
+        break;
     
     case WM_COMMAND:
         if (LOWORD(wParam) == ID_END_TASK_BUTTON)
