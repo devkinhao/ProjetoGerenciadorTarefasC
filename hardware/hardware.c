@@ -1,4 +1,6 @@
 #include "hardware.h"
+#include "../utils/utils.h"
+
 
 #define SECTION_SPACING 10
 #define GROUPBOX_HEIGHT 30
@@ -45,20 +47,38 @@ ULONGLONG FileTimeToULL(FILETIME ft) {
     return uli.QuadPart;
 }
 
-HWND CreateLabel(HWND parent, const char* text, int x, int y, int width, int height) {
-    return CreateWindowEx(0, "STATIC", text,
-        WS_CHILD | WS_VISIBLE | SS_LEFT, 
+HWND CreateLabel(HWND parent, const char* text, int x, int y, int width, int height, DWORD alignStyle) {
+    // Criar a janela
+    HWND hLabel = CreateWindowEx(0, "STATIC", text,
+        WS_CHILD | WS_VISIBLE | alignStyle,
         x, y, width, height, 
         parent, NULL, GetModuleHandle(NULL), NULL);
+
+    // Criar a fonte personalizada
+    HFONT hFont = CreateFontForControl();
+    
+    // Aplicar a fonte ao label
+    SendMessage(hLabel, WM_SETFONT, (WPARAM)hFont, TRUE);
+
+    return hLabel;
 }
 
+
 HWND CreateGroupBox(HWND parent, const char* title, int x, int y, int width, int height) {
-    return CreateWindowEx(0, "BUTTON", title,
+    // Criar a janela
+    HWND hGroupBox = CreateWindowEx(0, "BUTTON", title,
         WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 
         x, y, width, height, 
         parent, NULL, GetModuleHandle(NULL), NULL);
-}
 
+    // Criar a fonte personalizada
+    HFONT hFont = CreateFontForControl();
+    
+    // Aplicar a fonte ao group box
+    SendMessage(hGroupBox, WM_SETFONT, (WPARAM)hFont, TRUE);
+
+    return hGroupBox;
+}
 
 double CalculateCpuUsage() {
     FILETIME idleTime, kernelTime, userTime;
@@ -118,24 +138,24 @@ void UpdateCpuInfo() {
     }
 
     DWORD count = len / sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION);
-    DWORD l1 = 0, l2 = 0, l3 = 0;
+    DWORD l1Total = 0, l2Total = 0, l3Total = 0;
 
     for (DWORD i = 0; i < count; ++i) {
         if (info[i].Relationship == RelationCache) {
             CACHE_DESCRIPTOR cache = info[i].Cache;
-            if (cache.Level == 1 && l1 == 0) l1 = cache.Size / 1024;
-            else if (cache.Level == 2 && l2 == 0) l2 = cache.Size / 1024;
-            else if (cache.Level == 3 && l3 == 0) l3 = cache.Size / 1024;
+            if (cache.Level == 1) l1Total += cache.Size / 1024; // Somando os caches L1
+            else if (cache.Level == 2) l2Total += cache.Size / 1024; // Somando os caches L2
+            else if (cache.Level == 3) l3Total = cache.Size / 1024 / 1024; // Cache L3 compartilhado
         }
     }
 
     free(info);
 
-    snprintf(buffer, sizeof(buffer), "L1 Cache: %u KB", l1);
+    snprintf(buffer, sizeof(buffer), "L1 Cache: %u KB", l1Total);
     SetWindowText(cpuControls.hCacheL1, buffer);
-    snprintf(buffer, sizeof(buffer), "L2 Cache: %u KB", l2);
+    snprintf(buffer, sizeof(buffer), "L2 Cache: %u KB", l2Total);
     SetWindowText(cpuControls.hCacheL2, buffer);
-    snprintf(buffer, sizeof(buffer), "L3 Cache: %u KB", l3);
+    snprintf(buffer, sizeof(buffer), "L3 Cache: %.1f MB", (float)l3Total);
     SetWindowText(cpuControls.hCacheL3, buffer);
 }
 
@@ -304,43 +324,44 @@ void AddHardwarePanel(HWND hwndParent) {
 
     // --- CPU Section ---
     cpuControls.hGroup = CreateGroupBox(hHardwarePanel, "CPU", 10, yPos, LEFT_COLUMN_WIDTH, 210);
-    cpuControls.hName = CreateLabel(hHardwarePanel, "Model: Loading...", 20, yPos + 25, LEFT_COLUMN_WIDTH - 20, 20);
-    cpuControls.hCores = CreateLabel(hHardwarePanel, "Cores: Loading...", 20, yPos + 50, LEFT_COLUMN_WIDTH - 20, 20);
-    cpuControls.hUsage = CreateLabel(hHardwarePanel, "Usage: 0%", 20, yPos + 75, LEFT_COLUMN_WIDTH - 20, 20);
-    cpuControls.hSpeed = CreateLabel(hHardwarePanel, "Speed: 0.00 GHz", 20, yPos + 100, LEFT_COLUMN_WIDTH - 20, 20);
-    cpuControls.hCacheL1 = CreateLabel(hHardwarePanel, "L1 Cache: Loading...", 20, yPos + 125, LEFT_COLUMN_WIDTH - 20, 20);
-    cpuControls.hCacheL2 = CreateLabel(hHardwarePanel, "L2 Cache: Loading...", 20, yPos + 150, LEFT_COLUMN_WIDTH - 20, 20);
-    cpuControls.hCacheL3 = CreateLabel(hHardwarePanel, "L3 Cache: Loading...", 20, yPos + 175, LEFT_COLUMN_WIDTH - 20, 20);
+    cpuControls.hName = CreateLabel(hHardwarePanel, "Model: Loading...", 20, yPos + 25, LEFT_COLUMN_WIDTH - 20, 20, SS_LEFT);
+    cpuControls.hCores = CreateLabel(hHardwarePanel, "Cores: Loading...", 20, yPos + 50, LEFT_COLUMN_WIDTH - 20, 20, SS_LEFT);
+    cpuControls.hUsage = CreateLabel(hHardwarePanel, "Usage: 0%", 20, yPos + 75, LEFT_COLUMN_WIDTH - 20, 20, SS_LEFT);
+    cpuControls.hSpeed = CreateLabel(hHardwarePanel, "Speed: 0.00 GHz", 20, yPos + 100, LEFT_COLUMN_WIDTH - 20, 20, SS_LEFT);
+    cpuControls.hCacheL1 = CreateLabel(hHardwarePanel, "L1 Cache: Loading...", 20, yPos + 125, LEFT_COLUMN_WIDTH - 20, 20, SS_LEFT);
+    cpuControls.hCacheL2 = CreateLabel(hHardwarePanel, "L2 Cache: Loading...", 20, yPos + 150, LEFT_COLUMN_WIDTH - 20, 20, SS_LEFT);
+    cpuControls.hCacheL3 = CreateLabel(hHardwarePanel, "L3 Cache: Loading...", 20, yPos + 175, LEFT_COLUMN_WIDTH - 20, 20, SS_LEFT);
     
     yPos += 210 + SECTION_SPACING;
 
     // --- Seções RAM, Disco, SO, GPU, Bateria, Sistema ---
     hRamGroup = CreateGroupBox(hHardwarePanel, "Memory", 10, yPos, LEFT_COLUMN_WIDTH, 75);
-    hLabelRam = CreateLabel(hHardwarePanel, "Total: Loading...\nFree: Loading...", 20, yPos + GROUPBOX_TOP_MARGIN, LEFT_COLUMN_WIDTH - 20, 45);
+    hLabelRam = CreateLabel(hHardwarePanel, "Total: Loading...\nFree: Loading...", 20, yPos + GROUPBOX_TOP_MARGIN, LEFT_COLUMN_WIDTH - 20, 45, SS_LEFT);
     yPos += 75 + SECTION_SPACING;
 
     hDiskGroup = CreateGroupBox(hHardwarePanel, "Storage", 10, yPos, LEFT_COLUMN_WIDTH, 75);
-    hLabelDisk = CreateLabel(hHardwarePanel, "Total: Loading...\nFree: Loading...", 20, yPos + GROUPBOX_TOP_MARGIN, LEFT_COLUMN_WIDTH - 20, 45);
+    hLabelDisk = CreateLabel(hHardwarePanel, "Total: Loading...\nFree: Loading...", 20, yPos + GROUPBOX_TOP_MARGIN, LEFT_COLUMN_WIDTH - 20, 45, SS_LEFT);
     yPos += 75 + SECTION_SPACING;
 
     // --- Coluna da direita ---
     int yPosRight = 10;  // Começar a coluna direita no mesmo nível da coluna esquerda
     hOsGroup = CreateGroupBox(hHardwarePanel, "Operating System", LEFT_COLUMN_WIDTH + 20, yPosRight, RIGHT_COLUMN_WIDTH, 75);
-    hLabelOs = CreateLabel(hHardwarePanel, "OS: Loading...\nVersion: Loading...", LEFT_COLUMN_WIDTH + 30, yPosRight + GROUPBOX_TOP_MARGIN, RIGHT_COLUMN_WIDTH - 20, 45);
+    hLabelOs = CreateLabel(hHardwarePanel, "OS: Loading...\nVersion: Loading...", LEFT_COLUMN_WIDTH + 30, yPosRight + GROUPBOX_TOP_MARGIN, RIGHT_COLUMN_WIDTH - 20, 45, SS_LEFT);
     yPosRight += 75 + SECTION_SPACING;
 
     hGpuGroup = CreateGroupBox(hHardwarePanel, "Graphics", LEFT_COLUMN_WIDTH + 20, yPosRight, RIGHT_COLUMN_WIDTH, 60);
-    hLabelGpu = CreateLabel(hHardwarePanel, "GPU: Loading...", LEFT_COLUMN_WIDTH + 30, yPosRight + GROUPBOX_TOP_MARGIN, RIGHT_COLUMN_WIDTH - 20, 20);
+    hLabelGpu = CreateLabel(hHardwarePanel, "GPU: Loading...", LEFT_COLUMN_WIDTH + 30, yPosRight + GROUPBOX_TOP_MARGIN, RIGHT_COLUMN_WIDTH - 20, 20, SS_LEFT);
     yPosRight += 60 + SECTION_SPACING;
 
     hBatteryGroup = CreateGroupBox(hHardwarePanel, "Power", LEFT_COLUMN_WIDTH + 20, yPosRight, RIGHT_COLUMN_WIDTH, 60);
-    hLabelBattery = CreateLabel(hHardwarePanel, "Battery: Loading...", LEFT_COLUMN_WIDTH + 30, yPosRight + GROUPBOX_TOP_MARGIN, RIGHT_COLUMN_WIDTH - 20, 20);
+    hLabelBattery = CreateLabel(hHardwarePanel, "Battery: Loading...", LEFT_COLUMN_WIDTH + 30, yPosRight + GROUPBOX_TOP_MARGIN, RIGHT_COLUMN_WIDTH - 20, 20, SS_LEFT);
     yPosRight += 60 + SECTION_SPACING;
 
     hSystemGroup = CreateGroupBox(hHardwarePanel, "System", LEFT_COLUMN_WIDTH + 20, yPosRight, RIGHT_COLUMN_WIDTH, 75);
-    hLabelSystem = CreateLabel(hHardwarePanel, "Computer: Loading...\nUser: Loading...", LEFT_COLUMN_WIDTH + 30, yPosRight + GROUPBOX_TOP_MARGIN, RIGHT_COLUMN_WIDTH - 20, 45);
+    hLabelSystem = CreateLabel(hHardwarePanel, "Computer: Loading...\nUser: Loading...", LEFT_COLUMN_WIDTH + 30, yPosRight + GROUPBOX_TOP_MARGIN, RIGHT_COLUMN_WIDTH - 20, 45, SS_LEFT);
     
-    hLabelUptime = CreateLabel(hHardwarePanel, "Uptime: Loading...", 10, WINDOW_HEIGHT - 100, WINDOW_WIDTH - 40, UPTIME_HEIGHT);
+    hLabelUptime = CreateLabel(hHardwarePanel, "Uptime: Loading...", (WINDOW_WIDTH - (WINDOW_WIDTH - 40)) / 2, WINDOW_HEIGHT - 100, WINDOW_WIDTH - 40, UPTIME_HEIGHT, SS_CENTER);
+
 }
 
 void UpdateHardwareInfo() {

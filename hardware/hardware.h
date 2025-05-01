@@ -6,7 +6,7 @@
 // Declaracoes de funcoes para a aba Hardware
 BOOL Is64BitWindows();
 ULONGLONG FileTimeToULL(FILETIME ft);
-HWND CreateLabel(HWND parent, const char* text, int x, int y, int width, int height);
+HWND CreateLabel(HWND parent, const char* text, int x, int y, int width, int height, DWORD alignStyle);
 HWND CreateGroupBox(HWND parent, const char* title, int x, int y, int width, int height);
 double CalculateCpuUsage();
 void UpdateCpuInfo();
