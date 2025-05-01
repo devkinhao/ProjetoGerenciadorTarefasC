@@ -1,41 +1,31 @@
 #include "hardware.h"
-#include "..\utils\utils.h"
-#include <winbase.h>
-#include <ctype.h>
-#include <iphlpapi.h>
-#include <ws2tcpip.h>
-#include <powrprof.h>
-#include <commctrl.h>
-#pragma comment(lib, "Shlwapi.lib")
-#pragma comment(lib, "iphlpapi.lib")
-#pragma comment(lib, "powrprof.lib")
-#pragma comment(lib, "comctl32.lib")
 
-// Definições de layout
 #define SECTION_SPACING 10
 #define GROUPBOX_HEIGHT 30
 #define ITEM_SPACING 25
 #define LEFT_COLUMN_WIDTH 350
 #define RIGHT_COLUMN_WIDTH (WINDOW_WIDTH - LEFT_COLUMN_WIDTH - 40)
 
-// Estrutura para controles da CPU
+#define GROUPBOX_TOP_MARGIN 25
+#define UPTIME_HEIGHT 20
+
 typedef struct {
     HWND hGroup;
     HWND hName;
     HWND hCores;
     HWND hUsage;
     HWND hSpeed;
+    HWND hCacheL1;
+    HWND hCacheL2;
+    HWND hCacheL3;
 } CpuControls;
 
-// Variáveis de controle
 static CpuControls cpuControls;
-HWND hHardwarePanel;
 HWND hRamGroup, hDiskGroup, hOsGroup, hGpuGroup, hBatteryGroup, hSystemGroup;
 HWND hLabelRam, hLabelDisk, hLabelOs, hLabelGpu, hLabelBattery, hLabelSystem, hLabelUptime;
 
 static FILETIME prevIdleTime = {0}, prevKernelTime = {0}, prevUserTime = {0};
 
-// Função para verificar se o Windows é 64 bits
 BOOL Is64BitWindows() {
 #if defined(_WIN64)
     return TRUE;
@@ -48,7 +38,6 @@ BOOL Is64BitWindows() {
 #endif
 }
 
-// Converter FILETIME para ULONGLONG
 ULONGLONG FileTimeToULL(FILETIME ft) {
     ULARGE_INTEGER uli;
     uli.LowPart = ft.dwLowDateTime;
@@ -56,7 +45,21 @@ ULONGLONG FileTimeToULL(FILETIME ft) {
     return uli.QuadPart;
 }
 
-// Calcular a utilização da CPU em %
+HWND CreateLabel(HWND parent, const char* text, int x, int y, int width, int height) {
+    return CreateWindowEx(0, "STATIC", text,
+        WS_CHILD | WS_VISIBLE | SS_LEFT, 
+        x, y, width, height, 
+        parent, NULL, GetModuleHandle(NULL), NULL);
+}
+
+HWND CreateGroupBox(HWND parent, const char* title, int x, int y, int width, int height) {
+    return CreateWindowEx(0, "BUTTON", title,
+        WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 
+        x, y, width, height, 
+        parent, NULL, GetModuleHandle(NULL), NULL);
+}
+
+
 double CalculateCpuUsage() {
     FILETIME idleTime, kernelTime, userTime;
     if (!GetSystemTimes(&idleTime, &kernelTime, &userTime)) {
@@ -78,147 +81,8 @@ double CalculateCpuUsage() {
     return (double)(totalSystem - idleDiff) * 100.0 / totalSystem;
 }
 
-void AddHardwarePanel(HWND hwndParent) {
-    // Painel principal com margens ajustadas
-    hHardwarePanel = CreateWindowEx(0, "STATIC", "",
-        WS_CHILD | WS_VISIBLE | SS_LEFT,
-        10, 40, WINDOW_WIDTH - 20, WINDOW_HEIGHT - 50,
-        hwndParent, NULL, GetModuleHandle(NULL), NULL);
-
-    ShowWindow(hHardwarePanel, SW_HIDE);
-
-    // Configurações de estilo
-    const char* groupBoxClass = "BUTTON";
-    DWORD groupBoxStyle = WS_CHILD | WS_VISIBLE | BS_GROUPBOX;
-    DWORD valueStyle = WS_CHILD | WS_VISIBLE | SS_LEFT;
-
-    // Constantes de layout ajustadas
-    const int GROUPBOX_TOP_MARGIN = 25;  // Aumentado para melhor visualização
-    const int UPTIME_TOP_MARGIN = 30;    // Margem acima do uptime
-    const int UPTIME_HEIGHT = 25;        // Altura do campo uptime
-
-    // Posicionamento inicial
-    int yPos = 10;
-
-    // --- COLUNA ESQUERDA ---
-    
-    // Seção CPU (altura ajustada)
-    cpuControls.hGroup = CreateWindowEx(0, groupBoxClass, "CPU",
-        groupBoxStyle,
-        10, yPos, LEFT_COLUMN_WIDTH, 130,
-        hHardwarePanel, NULL, GetModuleHandle(NULL), NULL);
-    
-    cpuControls.hName = CreateWindowEx(0, "STATIC", "Model: Loading...",
-        valueStyle,
-        20, yPos + GROUPBOX_TOP_MARGIN, LEFT_COLUMN_WIDTH - 20, 20,
-        hHardwarePanel, NULL, GetModuleHandle(NULL), NULL);
-    
-    cpuControls.hCores = CreateWindowEx(0, "STATIC", "Cores: Loading...",
-        valueStyle,
-        20, yPos + GROUPBOX_TOP_MARGIN + ITEM_SPACING, LEFT_COLUMN_WIDTH - 20, 20,
-        hHardwarePanel, NULL, GetModuleHandle(NULL), NULL);
-    
-    cpuControls.hUsage = CreateWindowEx(0, "STATIC", "Usage: 0%",
-        valueStyle,
-        20, yPos + GROUPBOX_TOP_MARGIN + ITEM_SPACING*2, LEFT_COLUMN_WIDTH - 20, 20,
-        hHardwarePanel, NULL, GetModuleHandle(NULL), NULL);
-    
-    cpuControls.hSpeed = CreateWindowEx(0, "STATIC", "Speed: 0.00 GHz",
-        valueStyle,
-        20, yPos + GROUPBOX_TOP_MARGIN + ITEM_SPACING*3, LEFT_COLUMN_WIDTH - 20, 20,
-        hHardwarePanel, NULL, GetModuleHandle(NULL), NULL);
-
-    yPos += 130 + SECTION_SPACING;
-
-    // Seção RAM (altura ajustada)
-    hRamGroup = CreateWindowEx(0, groupBoxClass, "Memory",
-        groupBoxStyle,
-        10, yPos, LEFT_COLUMN_WIDTH, 75,  // Aumentado para 75
-        hHardwarePanel, NULL, GetModuleHandle(NULL), NULL);
-    
-    hLabelRam = CreateWindowEx(0, "STATIC", "Total: Loading...\nFree: Loading...",
-        valueStyle | SS_NOPREFIX,
-        20, yPos + GROUPBOX_TOP_MARGIN, LEFT_COLUMN_WIDTH - 20, 45,  // Aumentado para 45
-        hHardwarePanel, NULL, GetModuleHandle(NULL), NULL);
-
-    yPos += 75 + SECTION_SPACING;  // Ajustado para 75
-
-    // Seção Disco (altura ajustada)
-    hDiskGroup = CreateWindowEx(0, groupBoxClass, "Storage",
-        groupBoxStyle,
-        10, yPos, LEFT_COLUMN_WIDTH, 75,  // Aumentado para 75
-        hHardwarePanel, NULL, GetModuleHandle(NULL), NULL);
-    
-    hLabelDisk = CreateWindowEx(0, "STATIC", "Total: Loading...\nFree: Loading...",
-        valueStyle | SS_NOPREFIX,
-        20, yPos + GROUPBOX_TOP_MARGIN, LEFT_COLUMN_WIDTH - 20, 45,  // Aumentado para 45
-        hHardwarePanel, NULL, GetModuleHandle(NULL), NULL);
-
-    // --- COLUNA DIREITA ---
-    yPos = 10;
-
-    // Seção Sistema Operacional (altura ajustada)
-    hOsGroup = CreateWindowEx(0, groupBoxClass, "Operating System",
-        groupBoxStyle,
-        LEFT_COLUMN_WIDTH + 20, yPos, RIGHT_COLUMN_WIDTH, 75,  // Aumentado para 75
-        hHardwarePanel, NULL, GetModuleHandle(NULL), NULL);
-    
-    hLabelOs = CreateWindowEx(0, "STATIC", "OS: Loading...\nVersion: Loading...",
-        valueStyle | SS_NOPREFIX,
-        LEFT_COLUMN_WIDTH + 30, yPos + GROUPBOX_TOP_MARGIN, RIGHT_COLUMN_WIDTH - 20, 45,  // Aumentado para 45
-        hHardwarePanel, NULL, GetModuleHandle(NULL), NULL);
-
-    yPos += 75 + SECTION_SPACING;  // Ajustado para 75
-
-    // Seção GPU (altura ajustada)
-    hGpuGroup = CreateWindowEx(0, groupBoxClass, "Graphics",
-        groupBoxStyle,
-        LEFT_COLUMN_WIDTH + 20, yPos, RIGHT_COLUMN_WIDTH, 60,
-        hHardwarePanel, NULL, GetModuleHandle(NULL), NULL);
-    
-    hLabelGpu = CreateWindowEx(0, "STATIC", "GPU: Loading...",
-        valueStyle,
-        LEFT_COLUMN_WIDTH + 30, yPos + GROUPBOX_TOP_MARGIN, RIGHT_COLUMN_WIDTH - 20, 20,
-        hHardwarePanel, NULL, GetModuleHandle(NULL), NULL);
-
-    yPos += 60 + SECTION_SPACING;
-
-    // Seção Bateria (altura ajustada)
-    hBatteryGroup = CreateWindowEx(0, groupBoxClass, "Power",
-        groupBoxStyle,
-        LEFT_COLUMN_WIDTH + 20, yPos, RIGHT_COLUMN_WIDTH, 60,
-        hHardwarePanel, NULL, GetModuleHandle(NULL), NULL);
-    
-    hLabelBattery = CreateWindowEx(0, "STATIC", "Battery: Loading...",
-        valueStyle,
-        LEFT_COLUMN_WIDTH + 30, yPos + GROUPBOX_TOP_MARGIN, RIGHT_COLUMN_WIDTH - 20, 20,
-        hHardwarePanel, NULL, GetModuleHandle(NULL), NULL);
-
-    yPos += 60 + SECTION_SPACING;
-
-    // Seção Sistema (altura ajustada)
-    hSystemGroup = CreateWindowEx(0, groupBoxClass, "System",
-        groupBoxStyle,
-        LEFT_COLUMN_WIDTH + 20, yPos, RIGHT_COLUMN_WIDTH, 75,  // Aumentado para 75
-        hHardwarePanel, NULL, GetModuleHandle(NULL), NULL);
-    
-    hLabelSystem = CreateWindowEx(0, "STATIC", "Computer: Loading...\nUser: Loading...",
-        valueStyle | SS_NOPREFIX,
-        LEFT_COLUMN_WIDTH + 30, yPos + GROUPBOX_TOP_MARGIN, RIGHT_COLUMN_WIDTH - 20, 45,  // Aumentado para 45
-        hHardwarePanel, NULL, GetModuleHandle(NULL), NULL);
-
-    // Uptime reposicionado mais para cima
-    hLabelUptime = CreateWindowEx(0, "STATIC", "Uptime: Loading...",
-        WS_CHILD | WS_VISIBLE | SS_CENTER,
-        10, WINDOW_HEIGHT - 100,  // Movido para cima (de -80 para -100)
-        WINDOW_WIDTH - 40, UPTIME_HEIGHT,
-        hHardwarePanel, NULL, GetModuleHandle(NULL), NULL);
-}
-
-void UpdateHardwareInfo() {
+void UpdateCpuInfo() {
     char buffer[256];
-
-    // Atualizar informações da CPU
     HKEY hKeyProcessor;
     char cpuName[256] = "Unknown CPU";
     DWORD cpuMHz = 0;
@@ -226,76 +90,132 @@ void UpdateHardwareInfo() {
     if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, "HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0", 0, KEY_READ, &hKeyProcessor) == ERROR_SUCCESS) {
         DWORD size = sizeof(cpuName);
         RegQueryValueEx(hKeyProcessor, "ProcessorNameString", NULL, NULL, (LPBYTE)cpuName, &size);
-
         size = sizeof(cpuMHz);
         RegQueryValueEx(hKeyProcessor, "~MHz", NULL, NULL, (LPBYTE)&cpuMHz, &size);
-
         RegCloseKey(hKeyProcessor);
     }
-
-    // Obter número de processadores lógicos (forma mais confiável)
-    SYSTEM_INFO sysInfo;
-    GetSystemInfo(&sysInfo);
-    DWORD logicalProcessors = sysInfo.dwNumberOfProcessors;
 
     double cpuUsage = CalculateCpuUsage();
     double clockSpeed = (double)cpuMHz / 1000.0;
 
     SetWindowText(cpuControls.hName, cpuName);
-    snprintf(buffer, sizeof(buffer), "Logical Processors: %d", logicalProcessors);
+    snprintf(buffer, sizeof(buffer), "Logical Processors: %d", sysInfo.dwNumberOfProcessors);
     SetWindowText(cpuControls.hCores, buffer);
     snprintf(buffer, sizeof(buffer), "Usage: %d%%", (int)cpuUsage);
     SetWindowText(cpuControls.hUsage, buffer);
     snprintf(buffer, sizeof(buffer), "Speed: %.2f GHz", clockSpeed);
     SetWindowText(cpuControls.hSpeed, buffer);
 
-    // Atualizar informações da RAM
+    // Cache info (L1, L2, L3)
+    DWORD len = 0;
+    GetLogicalProcessorInformation(NULL, &len);
+    SYSTEM_LOGICAL_PROCESSOR_INFORMATION* info = (SYSTEM_LOGICAL_PROCESSOR_INFORMATION*)malloc(len);
+    if (!info) return;
+
+    if (!GetLogicalProcessorInformation(info, &len)) {
+        free(info);
+        return;
+    }
+
+    DWORD count = len / sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION);
+    DWORD l1 = 0, l2 = 0, l3 = 0;
+
+    for (DWORD i = 0; i < count; ++i) {
+        if (info[i].Relationship == RelationCache) {
+            CACHE_DESCRIPTOR cache = info[i].Cache;
+            if (cache.Level == 1 && l1 == 0) l1 = cache.Size / 1024;
+            else if (cache.Level == 2 && l2 == 0) l2 = cache.Size / 1024;
+            else if (cache.Level == 3 && l3 == 0) l3 = cache.Size / 1024;
+        }
+    }
+
+    free(info);
+
+    snprintf(buffer, sizeof(buffer), "L1 Cache: %u KB", l1);
+    SetWindowText(cpuControls.hCacheL1, buffer);
+    snprintf(buffer, sizeof(buffer), "L2 Cache: %u KB", l2);
+    SetWindowText(cpuControls.hCacheL2, buffer);
+    snprintf(buffer, sizeof(buffer), "L3 Cache: %u KB", l3);
+    SetWindowText(cpuControls.hCacheL3, buffer);
+}
+
+void UpdateRamInfo() {
     MEMORYSTATUSEX memInfo;
     memInfo.dwLength = sizeof(memInfo);
     GlobalMemoryStatusEx(&memInfo);
-
     DWORDLONG totalRamMB = memInfo.ullTotalPhys / (1024 * 1024);
     DWORDLONG availRamMB = memInfo.ullAvailPhys / (1024 * 1024);
     DWORD usagePercent = memInfo.dwMemoryLoad;
-
+    char buffer[256];
     snprintf(buffer, sizeof(buffer), "Total: %llu MB\nFree: %llu MB (%lu%%)", totalRamMB, availRamMB, usagePercent);
     SetWindowText(hLabelRam, buffer);
+}
 
-    // Atualizar informações do Disco
-    ULARGE_INTEGER freeBytesAvailable, totalNumberOfBytes, totalNumberOfFreeBytes;
-    if (GetDiskFreeSpaceEx(NULL, &freeBytesAvailable, &totalNumberOfBytes, &totalNumberOfFreeBytes)) {
-        DWORDLONG totalDiskGB = totalNumberOfBytes.QuadPart / (1024 * 1024 * 1024);
-        DWORDLONG freeDiskGB = totalNumberOfFreeBytes.QuadPart / (1024 * 1024 * 1024);
-        DWORD usagePercentDisk = 100 - (DWORD)((freeDiskGB * 100) / totalDiskGB);
+void UpdateDiskInfo(HWND hDiskLabel) {
+    DWORD drives = GetLogicalDrives();
+    char buffer[2048] = "";
+    char temp[512];
 
-        snprintf(buffer, sizeof(buffer), "Total: %llu GB\nFree: %llu GB (%lu%%)", totalDiskGB, freeDiskGB, usagePercentDisk);
-        SetWindowText(hLabelDisk, buffer);
+    for (char letter = 'A'; letter <= 'Z'; ++letter) {
+        if (drives & (1 << (letter - 'A'))) {
+            char rootPath[4] = { letter, ':', '\\', '\0' };
+
+            ULARGE_INTEGER freeBytesAvailable, totalBytes, totalFreeBytes;
+            char volumeName[MAX_PATH] = {0};
+
+            GetVolumeInformationA(rootPath, volumeName, MAX_PATH, NULL, NULL, NULL, NULL, 0);
+
+            if (GetDiskFreeSpaceEx(rootPath, &freeBytesAvailable, &totalBytes, &totalFreeBytes)) {
+                double totalGB = (double)totalBytes.QuadPart / (1024 * 1024 * 1024);
+                double freeGB = (double)totalFreeBytes.QuadPart / (1024 * 1024 * 1024);
+
+                if (volumeName[0]) {
+                    snprintf(temp, sizeof(temp),
+                        "Disco %c (%s): %.2f GB livre / %.2f GB total\n",
+                        letter, volumeName, freeGB, totalGB);
+                } else {
+                    snprintf(temp, sizeof(temp),
+                        "Disco %c: %.2f GB livre / %.2f GB total\n",
+                        letter, freeGB, totalGB);
+                }
+
+                strncat(buffer, temp, sizeof(buffer) - strlen(buffer) - 1);
+            }
+        }
     }
 
-    // Atualizar informações do SO
+    SetWindowText(hDiskLabel, strlen(buffer) ? buffer : "Nenhuma unidade detectada.");
+}
+
+void UpdateOSInfo(HWND hLabelOs) {
     HKEY hKeyOS;
     char osName[256] = "Unknown OS";
     char osDisplayVersion[256] = "Unknown Version";
     char osBuild[256] = "Unknown Build";
-    
-    if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion", 0, KEY_READ, &hKeyOS) == ERROR_SUCCESS) {
-        DWORD size = sizeof(osName);
-        RegQueryValueEx(hKeyOS, "ProductName", NULL, NULL, (LPBYTE)osName, &size);
+    char buffer[512];
+
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion", 0, KEY_READ, &hKeyOS) == ERROR_SUCCESS) {
+        DWORD size;
+
+        size = sizeof(osName);
+        RegQueryValueExA(hKeyOS, "ProductName", NULL, NULL, (LPBYTE)osName, &size);
 
         size = sizeof(osDisplayVersion);
-        RegQueryValueEx(hKeyOS, "DisplayVersion", NULL, NULL, (LPBYTE)osDisplayVersion, &size);
+        RegQueryValueExA(hKeyOS, "DisplayVersion", NULL, NULL, (LPBYTE)osDisplayVersion, &size);
 
         size = sizeof(osBuild);
-        RegQueryValueEx(hKeyOS, "CurrentBuild", NULL, NULL, (LPBYTE)osBuild, &size);
+        RegQueryValueExA(hKeyOS, "CurrentBuild", NULL, NULL, (LPBYTE)osBuild, &size);
 
         RegCloseKey(hKeyOS);
     }
 
     snprintf(buffer, sizeof(buffer), "OS: %s\nVersion: %s (Build %s)", osName, osDisplayVersion, osBuild);
-    SetWindowText(hLabelOs, buffer);
+    SetWindowTextA(hLabelOs, buffer);
+}
 
-    // Atualizar Uptime
-    ULONGLONG uptimeMillis = GetTickCount();
+void UpdateUptimeInfo(HWND hLabelUptime) {
+    char buffer[128];
+    ULONGLONG uptimeMillis = GetTickCount(); 
     ULONGLONG uptimeSecs = uptimeMillis / 1000;
     DWORD days = (DWORD)(uptimeSecs / 86400);
     DWORD hours = (DWORD)((uptimeSecs % 86400) / 3600);
@@ -303,14 +223,16 @@ void UpdateHardwareInfo() {
     DWORD seconds = (DWORD)(uptimeSecs % 60);
 
     snprintf(buffer, sizeof(buffer), "Uptime: %u:%02u:%02u:%02u", days, hours, minutes, seconds);
-    SetWindowText(hLabelUptime, buffer);
+    SetWindowTextA(hLabelUptime, buffer);
+}
 
-    // Atualizar informações da GPU
-    DISPLAY_DEVICE dd;
+void UpdateGPUInfo(HWND hLabelGpu) {
+    char buffer[256];
+    DISPLAY_DEVICEA dd;
     ZeroMemory(&dd, sizeof(dd));
-    dd.cb = sizeof(DISPLAY_DEVICE);
-    
-    if (EnumDisplayDevices(NULL, 0, &dd, 0)) {
+    dd.cb = sizeof(dd);
+
+    if (EnumDisplayDevicesA(NULL, 0, &dd, 0)) {
         for (int i = strlen(dd.DeviceString) - 1; i >= 0 && isspace(dd.DeviceString[i]); i--) {
             dd.DeviceString[i] = '\0';
         }
@@ -318,10 +240,14 @@ void UpdateHardwareInfo() {
     } else {
         snprintf(buffer, sizeof(buffer), "GPU: Not detected");
     }
-    SetWindowText(hLabelGpu, buffer);
 
-    // Atualizar informações da Bateria
+    SetWindowTextA(hLabelGpu, buffer);
+}
+
+void UpdateBatteryInfo(HWND hLabelBattery) {
+    char buffer[128];
     SYSTEM_POWER_STATUS status;
+
     if (GetSystemPowerStatus(&status)) {
         if (status.BatteryFlag == 128) {
             snprintf(buffer, sizeof(buffer), "Battery: Not present");
@@ -329,37 +255,103 @@ void UpdateHardwareInfo() {
             const char* statusStr = "Unknown";
             if (status.ACLineStatus == 1) statusStr = "Charging";
             else if (status.BatteryLifeTime != (DWORD)-1) statusStr = "Discharging";
-            
+
             snprintf(buffer, sizeof(buffer), "Battery: %d%% (%s)", status.BatteryLifePercent, statusStr);
         }
     } else {
         snprintf(buffer, sizeof(buffer), "Battery: Unknown");
     }
-    SetWindowText(hLabelBattery, buffer);
 
-    // Atualizar informações do Sistema
-    char computerName[MAX_COMPUTERNAME_LENGTH + 1];
+    SetWindowTextA(hLabelBattery, buffer);
+}
+
+void UpdateSystemInfo(HWND hLabelSystem) {
+    char buffer[512];
+    char computerName[MAX_COMPUTERNAME_LENGTH + 1] = "Unknown";
     DWORD sizeName = sizeof(computerName);
     GetComputerNameA(computerName, &sizeName);
 
-    char userName[256];
+    char userName[256] = "Unknown";
     DWORD sizeUser = sizeof(userName);
     GetUserNameA(userName, &sizeUser);
 
     HKEY hKey;
     char manufacturer[256] = "Unknown";
     char model[256] = "Unknown";
-    
-    if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, "HARDWARE\\DESCRIPTION\\System\\BIOS", 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, "HARDWARE\\DESCRIPTION\\System\\BIOS", 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
         DWORD bufSize = sizeof(manufacturer);
-        RegQueryValueEx(hKey, "SystemManufacturer", NULL, NULL, (LPBYTE)manufacturer, &bufSize);
+        RegQueryValueExA(hKey, "SystemManufacturer", NULL, NULL, (LPBYTE)manufacturer, &bufSize);
 
         bufSize = sizeof(model);
-        RegQueryValueEx(hKey, "SystemProductName", NULL, NULL, (LPBYTE)model, &bufSize);
+        RegQueryValueExA(hKey, "SystemProductName", NULL, NULL, (LPBYTE)model, &bufSize);
         RegCloseKey(hKey);
     }
 
     snprintf(buffer, sizeof(buffer), "Computer: %s (%s %s)\nUser: %s", 
              computerName, manufacturer, model, userName);
-    SetWindowText(hLabelSystem, buffer);
+    SetWindowTextA(hLabelSystem, buffer);
+}
+
+void AddHardwarePanel(HWND hwndParent) {
+    hHardwarePanel = CreateWindowEx(0, "STATIC", "", 
+        WS_CHILD | WS_VISIBLE | SS_LEFT,
+        10, 40, WINDOW_WIDTH - 20, WINDOW_HEIGHT - 50,
+        hwndParent, NULL, GetModuleHandle(NULL), NULL);
+    ShowWindow(hHardwarePanel, SW_HIDE);
+
+    int yPos = 10;
+
+    // --- CPU Section ---
+    cpuControls.hGroup = CreateGroupBox(hHardwarePanel, "CPU", 10, yPos, LEFT_COLUMN_WIDTH, 210);
+    cpuControls.hName = CreateLabel(hHardwarePanel, "Model: Loading...", 20, yPos + 25, LEFT_COLUMN_WIDTH - 20, 20);
+    cpuControls.hCores = CreateLabel(hHardwarePanel, "Cores: Loading...", 20, yPos + 50, LEFT_COLUMN_WIDTH - 20, 20);
+    cpuControls.hUsage = CreateLabel(hHardwarePanel, "Usage: 0%", 20, yPos + 75, LEFT_COLUMN_WIDTH - 20, 20);
+    cpuControls.hSpeed = CreateLabel(hHardwarePanel, "Speed: 0.00 GHz", 20, yPos + 100, LEFT_COLUMN_WIDTH - 20, 20);
+    cpuControls.hCacheL1 = CreateLabel(hHardwarePanel, "L1 Cache: Loading...", 20, yPos + 125, LEFT_COLUMN_WIDTH - 20, 20);
+    cpuControls.hCacheL2 = CreateLabel(hHardwarePanel, "L2 Cache: Loading...", 20, yPos + 150, LEFT_COLUMN_WIDTH - 20, 20);
+    cpuControls.hCacheL3 = CreateLabel(hHardwarePanel, "L3 Cache: Loading...", 20, yPos + 175, LEFT_COLUMN_WIDTH - 20, 20);
+    
+    yPos += 210 + SECTION_SPACING;
+
+    // --- Seções RAM, Disco, SO, GPU, Bateria, Sistema ---
+    hRamGroup = CreateGroupBox(hHardwarePanel, "Memory", 10, yPos, LEFT_COLUMN_WIDTH, 75);
+    hLabelRam = CreateLabel(hHardwarePanel, "Total: Loading...\nFree: Loading...", 20, yPos + GROUPBOX_TOP_MARGIN, LEFT_COLUMN_WIDTH - 20, 45);
+    yPos += 75 + SECTION_SPACING;
+
+    hDiskGroup = CreateGroupBox(hHardwarePanel, "Storage", 10, yPos, LEFT_COLUMN_WIDTH, 75);
+    hLabelDisk = CreateLabel(hHardwarePanel, "Total: Loading...\nFree: Loading...", 20, yPos + GROUPBOX_TOP_MARGIN, LEFT_COLUMN_WIDTH - 20, 45);
+    yPos += 75 + SECTION_SPACING;
+
+    // --- Coluna da direita ---
+    int yPosRight = 10;  // Começar a coluna direita no mesmo nível da coluna esquerda
+    hOsGroup = CreateGroupBox(hHardwarePanel, "Operating System", LEFT_COLUMN_WIDTH + 20, yPosRight, RIGHT_COLUMN_WIDTH, 75);
+    hLabelOs = CreateLabel(hHardwarePanel, "OS: Loading...\nVersion: Loading...", LEFT_COLUMN_WIDTH + 30, yPosRight + GROUPBOX_TOP_MARGIN, RIGHT_COLUMN_WIDTH - 20, 45);
+    yPosRight += 75 + SECTION_SPACING;
+
+    hGpuGroup = CreateGroupBox(hHardwarePanel, "Graphics", LEFT_COLUMN_WIDTH + 20, yPosRight, RIGHT_COLUMN_WIDTH, 60);
+    hLabelGpu = CreateLabel(hHardwarePanel, "GPU: Loading...", LEFT_COLUMN_WIDTH + 30, yPosRight + GROUPBOX_TOP_MARGIN, RIGHT_COLUMN_WIDTH - 20, 20);
+    yPosRight += 60 + SECTION_SPACING;
+
+    hBatteryGroup = CreateGroupBox(hHardwarePanel, "Power", LEFT_COLUMN_WIDTH + 20, yPosRight, RIGHT_COLUMN_WIDTH, 60);
+    hLabelBattery = CreateLabel(hHardwarePanel, "Battery: Loading...", LEFT_COLUMN_WIDTH + 30, yPosRight + GROUPBOX_TOP_MARGIN, RIGHT_COLUMN_WIDTH - 20, 20);
+    yPosRight += 60 + SECTION_SPACING;
+
+    hSystemGroup = CreateGroupBox(hHardwarePanel, "System", LEFT_COLUMN_WIDTH + 20, yPosRight, RIGHT_COLUMN_WIDTH, 75);
+    hLabelSystem = CreateLabel(hHardwarePanel, "Computer: Loading...\nUser: Loading...", LEFT_COLUMN_WIDTH + 30, yPosRight + GROUPBOX_TOP_MARGIN, RIGHT_COLUMN_WIDTH - 20, 45);
+    
+    hLabelUptime = CreateLabel(hHardwarePanel, "Uptime: Loading...", 10, WINDOW_HEIGHT - 100, WINDOW_WIDTH - 40, UPTIME_HEIGHT);
+}
+
+void UpdateHardwareInfo() {
+   
+    UpdateCpuInfo();
+    UpdateRamInfo();
+    UpdateDiskInfo(hLabelDisk);
+    UpdateOSInfo(hLabelOs);
+    UpdateUptimeInfo(hLabelUptime);
+    UpdateGPUInfo(hLabelGpu);
+    UpdateBatteryInfo(hLabelBattery);
+    UpdateSystemInfo(hLabelSystem);
+
 }

@@ -8,12 +8,12 @@ HFONT CreateFontForControl() {
 
 void CenterWindow(HWND hwnd, int windowWidth, int windowHeight) {
     RECT rect;
-    SystemParametersInfo(SPI_GETWORKAREA, 0, &rect, 0); // Obtém a área de trabalho da tela
+    SystemParametersInfo(SPI_GETWORKAREA, 0, &rect, 0);
 
-    int screenWidth = rect.right - rect.left;
+    int screenWidth  = rect.right  - rect.left;
     int screenHeight = rect.bottom - rect.top;
 
-    int posX = (screenWidth - windowWidth) / 2;
+    int posX = (screenWidth  - windowWidth)  / 2;
     int posY = (screenHeight - windowHeight) / 2;
 
     SetWindowPos(hwnd, HWND_TOP, posX, posY, 0, 0, SWP_NOSIZE);

@@ -4,6 +4,11 @@
 #include "hardware/hardware.h"
 #include "processes/processes.h"
 
+SYSTEM_INFO sysInfo;
+int numProcessors;
+HWND hTab, hListView, hButtonEndTask, hHardwarePanel;
+HFONT hFontTabs, hFontButton;
+
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     switch (msg)

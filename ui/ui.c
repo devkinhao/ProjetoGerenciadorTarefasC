@@ -93,7 +93,7 @@ void ShowAffinityDialog(HWND hwndParent, HANDLE hProcess) {
         checkboxes[i] = CreateWindow("BUTTON", label,
             WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
             20, 20 + i * 30, 100, 25,
-            hDlg, (HMENU)(1000 + i), GetModuleHandle(NULL), NULL);
+            hDlg, (HMENU)(uintptr_t)(1000 + i), GetModuleHandle(NULL), NULL);
 
         if (processAffinity & ((DWORD_PTR)1 << i)) {
             SendMessage(checkboxes[i], BM_SETCHECK, BST_CHECKED, 0);
