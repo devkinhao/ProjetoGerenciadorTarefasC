@@ -93,7 +93,7 @@ int main() {
 
     if (!hwnd)
     {
-        MessageBox(NULL, "Erro ao criar a janela!", "Erro", MB_ICONERROR | MB_OK);
+        MessageBox(NULL, "Error creating window!", "Error", MB_ICONERROR | MB_OK);
         return 1;
     }
 

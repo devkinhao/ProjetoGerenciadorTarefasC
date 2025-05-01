@@ -77,11 +77,11 @@ void CleanupResources() {
 void ShowAffinityDialog(HWND hwndParent, HANDLE hProcess) {
     DWORD_PTR processAffinity, systemAffinity;
     if (!GetProcessAffinityMask(hProcess, &processAffinity, &systemAffinity)) {
-        MessageBox(hwndParent, "Erro ao obter afinidade.", "Erro", MB_OK | MB_ICONERROR);
+        MessageBox(hwndParent, "Error getting affinity", "Error", MB_OK | MB_ICONERROR);
         return;
     }
 
-    HWND hDlg = CreateWindowEx(WS_EX_DLGMODALFRAME, "STATIC", "Definir Afinidade",
+    HWND hDlg = CreateWindowEx(WS_EX_DLGMODALFRAME, "STATIC", "Set Affinity",
         WS_POPUPWINDOW | WS_CAPTION | WS_SYSMENU,
         300, 200, 300, 100 + 30 * numProcessors,
         hwndParent, NULL, GetModuleHandle(NULL), NULL);
@@ -105,7 +105,7 @@ void ShowAffinityDialog(HWND hwndParent, HANDLE hProcess) {
         140, 30 * numProcessors + 30, 60, 25,
         hDlg, (HMENU)9999, GetModuleHandle(NULL), NULL);
 
-    HWND hCancel = CreateWindow("BUTTON", "Cancelar",
+    HWND hCancel = CreateWindow("BUTTON", "Cancel",
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
         210, 30 * numProcessors + 30, 70, 25,
         hDlg, (HMENU)9998, GetModuleHandle(NULL), NULL);
@@ -131,12 +131,12 @@ void ShowAffinityDialog(HWND hwndParent, HANDLE hProcess) {
                     }
                 }
                 if (newMask == 0) {
-                    MessageBox(hwndParent, "Selecione pelo menos um CPU.", "Aviso", MB_OK | MB_ICONWARNING);
+                    MessageBox(hwndParent, "Select at least one CPU", "Warning", MB_OK | MB_ICONWARNING);
                 } else {
                     if (!SetProcessAffinityMask(hProcess, newMask)) {
-                        MessageBox(hwndParent, "Erro ao definir afinidade.", "Erro", MB_OK | MB_ICONERROR);
+                        MessageBox(hwndParent, "Error setting affinitty", "Error", MB_OK | MB_ICONERROR);
                     } else {
-                        MessageBox(hwndParent, "Afinidade definida com sucesso!", "Sucesso", MB_OK | MB_ICONINFORMATION);
+                        MessageBox(hwndParent, "Affinity set successfully!", "Success", MB_OK | MB_ICONINFORMATION);
                         running = FALSE;
                     }
                 }
@@ -171,7 +171,7 @@ void ShowContextMenu(HWND hwndListView, HWND hwndParent, POINT pt) {
     DWORD pid = strtoul(pidText, NULL, 10);
     HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);
     if (!hProcess) {
-        MessageBox(hwndParent, "Não foi possível abrir o processo.", "Erro", MB_OK | MB_ICONERROR);
+        MessageBox(hwndParent, "Unable to open process", "Error", MB_OK | MB_ICONERROR);
         return;
     }
 
@@ -187,8 +187,8 @@ void ShowContextMenu(HWND hwndListView, HWND hwndParent, POINT pt) {
     AppendMenu(hPriorityMenu, MF_STRING | (currentPriority == BELOW_NORMAL_PRIORITY_CLASS ? MF_CHECKED : 0), 105, "Below Normal");
     AppendMenu(hPriorityMenu, MF_STRING | (currentPriority == IDLE_PRIORITY_CLASS ? MF_CHECKED : 0), 106, "Low");
 
-    AppendMenu(hMenu, MF_POPUP, (UINT_PTR)hPriorityMenu, "Definir Prioridade");
-    AppendMenu(hMenu, MF_STRING, 2, "Definir Afinidade");
+    AppendMenu(hMenu, MF_POPUP, (UINT_PTR)hPriorityMenu, "Set priority");
+    AppendMenu(hMenu, MF_STRING, 2, "Set affinity");
 
     int cmd = TrackPopupMenu(hMenu, TPM_RETURNCMD | TPM_NONOTIFY, pt.x, pt.y, 0, hwndParent, NULL);
 
@@ -204,9 +204,9 @@ void ShowContextMenu(HWND hwndListView, HWND hwndParent, POINT pt) {
         }
 
         if (SetPriorityClass(hProcess, priority)) {
-            MessageBox(hwndParent, "Prioridade definida com sucesso!", "Sucesso", MB_OK);
+            MessageBox(hwndParent, "Priority set successfully!", "Success", MB_OK);
         } else {
-            MessageBox(hwndParent, "Falha ao definir prioridade.", "Erro", MB_OK | MB_ICONERROR);
+            MessageBox(hwndParent, "Failed to set priority", "Error", MB_OK | MB_ICONERROR);
         }
     } else if (cmd == 2) {
         ShowAffinityDialog(hwndParent, hProcess);

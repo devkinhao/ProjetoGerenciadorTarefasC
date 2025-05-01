@@ -259,7 +259,7 @@ void EndSelectedProcess(HWND hListView, HWND hwndParent) {
     int selectedIndex = ListView_GetNextItem(hListView, -1, LVNI_SELECTED);
     if (selectedIndex == -1)
     {
-        MessageBox(hwndParent, "Selecione um processo para finalizar.", "Aviso", MB_OK | MB_ICONWARNING);
+        MessageBox(hwndParent, "Select a process to end.", "Warning", MB_OK | MB_ICONWARNING);
         return;
     }
 
@@ -273,15 +273,15 @@ void EndSelectedProcess(HWND hListView, HWND hwndParent) {
 
     if (!ListView_GetItem(hListView, &item))
     {
-        MessageBox(hwndParent, "Erro ao obter o PID.", "Erro", MB_OK | MB_ICONERROR);
+        MessageBox(hwndParent, "Error getting PID.", "Error", MB_OK | MB_ICONERROR);
         return;
     }
 
     DWORD pid = strtoul(pidText, NULL, 10);
 
     char confirmMessage[256];
-    snprintf(confirmMessage, sizeof(confirmMessage), "Deseja realmente finalizar o processo com PID %u?", pid);
-    int response = MessageBox(hwndParent, confirmMessage, "Confirmar", MB_YESNO | MB_ICONQUESTION);
+    snprintf(confirmMessage, sizeof(confirmMessage), "Do you really want to end the process with PID %u?", pid);
+    int response = MessageBox(hwndParent, confirmMessage, "Confirm", MB_YESNO | MB_ICONQUESTION);
     if (response != IDYES)
     {
         return;
@@ -293,14 +293,14 @@ void EndSelectedProcess(HWND hListView, HWND hwndParent) {
         // Remover o item da lista após finalizar o processo
         ListView_DeleteItem(hListView, selectedIndex);
 
-        MessageBox(hwndParent, "Processo finalizado com sucesso.", "Sucesso", MB_OK | MB_ICONINFORMATION);
+        MessageBox(hwndParent, "Process completed successfully.", "Success", MB_OK | MB_ICONINFORMATION);
     }
     else
     {
         DWORD error = GetLastError();
         char errorMessage[256];
-        snprintf(errorMessage, sizeof(errorMessage), "Erro ao finalizar o processo. Código de erro: %lu", error);
-        MessageBox(hwndParent, errorMessage, "Erro", MB_OK | MB_ICONERROR);
+        snprintf(errorMessage, sizeof(errorMessage), "Error completing process. Error code: %lu", error);
+        MessageBox(hwndParent, errorMessage, "Error", MB_OK | MB_ICONERROR);
     }
         CloseHandle(hProcess);  
 }
