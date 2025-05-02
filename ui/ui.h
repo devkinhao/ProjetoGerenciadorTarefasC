@@ -3,6 +3,11 @@
 
 #include "..\config.h"
 
+typedef struct {
+    HANDLE hProcess;
+    char processName[MAX_PATH];
+} AffinityDialogParams;
+
 void AddTabs(HWND hwndParent);
 void AddListView(HWND hwndParent);
 void AddFooter(HWND hwndParent);

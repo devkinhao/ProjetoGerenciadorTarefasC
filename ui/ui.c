@@ -91,19 +91,16 @@ void UpdateOkButtonState(HWND hDlg, HWND hOk) {
 
 // Função de Callback para a janela de diálogo (modal)
 INT_PTR CALLBACK AffinityDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam) {
-    static HANDLE hProcess;
+    static AffinityDialogParams* params;
     static HWND hAllProcessors;
     static HWND hOk;
-    static char processName[MAX_PATH];
 
     switch (message) {
         case WM_INITDIALOG: {
-            // Se lParam é um struct, adapte aqui.
-            hProcess = (HANDLE)lParam;
-            GetWindowTextA(hDlg, processName, sizeof(processName)); // OU receba corretamente por lParam
-
+            params = (AffinityDialogParams*)lParam;
+            
             DWORD_PTR processAffinity, systemAffinity;
-            if (!GetProcessAffinityMask(hProcess, &processAffinity, &systemAffinity)) {
+            if (!GetProcessAffinityMask(params->hProcess, &processAffinity, &systemAffinity)) {
                 MessageBox(hDlg, "Error getting affinity", "Error", MB_OK | MB_ICONERROR);
                 EndDialog(hDlg, 0);
                 return FALSE;
@@ -111,10 +108,14 @@ INT_PTR CALLBACK AffinityDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPAR
 
             HFONT hFont = CreateFontForControl();
 
+            // Label com nome do processo - ajustando largura para (largura da janela - 10)
+            RECT rcDialog;
+            GetClientRect(hDlg, &rcDialog); // Obtém o tamanho da área cliente da janela
+
             // Label com nome do processo
             char labelText[256];
-            snprintf(labelText, sizeof(labelText), "Which processors are allowed to run \"%s\"?", processName);
-            HWND hLabel = CreateWindow("STATIC", labelText, WS_CHILD | WS_VISIBLE | SS_LEFT, 10, 10, 260, 30, hDlg, NULL, GetModuleHandle(NULL), NULL);
+            snprintf(labelText, sizeof(labelText), "Which processors are allowed to run \"%s\"?", params->processName);
+            HWND hLabel = CreateWindow("STATIC", labelText, WS_CHILD | WS_VISIBLE | SS_LEFT, 10, 10, rcDialog.right - rcDialog.left - 10, 30, hDlg, NULL, GetModuleHandle(NULL), NULL);
             SendMessage(hLabel, WM_SETFONT, (WPARAM)hFont, TRUE);
 
             // "<All Processors>" checkbox
@@ -208,7 +209,7 @@ INT_PTR CALLBACK AffinityDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPAR
                 if (newMask == 0) {
                     MessageBox(hDlg, "Select at least one CPU", "Warning", MB_OK | MB_ICONWARNING);
                 } else {
-                    if (!SetProcessAffinityMask(hProcess, newMask)) {
+                    if (!SetProcessAffinityMask(params->hProcess, newMask)) {
                         MessageBox(hDlg, "Error setting affinity", "Error", MB_OK | MB_ICONERROR);
                     } else {
                         MessageBox(hDlg, "Affinity set successfully!", "Success", MB_OK | MB_ICONINFORMATION);
@@ -232,8 +233,12 @@ INT_PTR CALLBACK AffinityDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPAR
 
 // Função principal para mostrar a janela de afinidade
 void ShowAffinityDialog(HWND hwndParent, HANDLE hProcess, const char* processName) {
-    // Janela de diálogo modal
-    DialogBoxParam(GetModuleHandle(NULL), MAKEINTRESOURCE(101), hwndParent, AffinityDialogProc, (LPARAM)hProcess);
+    AffinityDialogParams params;
+    params.hProcess = hProcess;
+    strncpy(params.processName, processName, MAX_PATH - 1);
+    params.processName[MAX_PATH - 1] = '\0';
+    
+    DialogBoxParam(GetModuleHandle(NULL), MAKEINTRESOURCE(101), hwndParent, AffinityDialogProc, (LPARAM)&params);
 }
 
 void ShowContextMenu(HWND hwndListView, HWND hwndParent, POINT pt) {
