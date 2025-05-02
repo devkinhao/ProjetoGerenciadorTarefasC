@@ -128,7 +128,7 @@ INT_PTR CALLBACK AffinityDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPAR
                 char label[32];
                 snprintf(label, sizeof(label), "CPU %d", i);
                 checkboxes[i] = CreateWindow("BUTTON", label, WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
-                    20, 80 + i * 30, 100, 25, hDlg, (HMENU)(UINT_PTR)(1001 + i), GetModuleHandle(NULL), NULL);       
+                    20, 70 + i * 20, 100, 25, hDlg, (HMENU)(UINT_PTR)(1001 + i), GetModuleHandle(NULL), NULL);       
                 SendMessage(checkboxes[i], WM_SETFONT, (WPARAM)hFont, TRUE);
 
                 if (processAffinity & ((DWORD_PTR)1 << i)) {
