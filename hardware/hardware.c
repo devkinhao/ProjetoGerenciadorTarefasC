@@ -138,24 +138,38 @@ void UpdateCpuInfo() {
     }
 
     DWORD count = len / sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION);
-    DWORD l1Total = 0, l2Total = 0, l3Total = 0;
+    DWORD l1TotalKB = 0, l2TotalKB = 0, l3TotalKB = 0;
 
     for (DWORD i = 0; i < count; ++i) {
         if (info[i].Relationship == RelationCache) {
             CACHE_DESCRIPTOR cache = info[i].Cache;
-            if (cache.Level == 1) l1Total += cache.Size / 1024; // Somando os caches L1
-            else if (cache.Level == 2) l2Total += cache.Size / 1024; // Somando os caches L2
-            else if (cache.Level == 3) l3Total = cache.Size / 1024 / 1024; // Cache L3 compartilhado
+            if (cache.Level == 1) l1TotalKB += cache.Size / 1024;
+            else if (cache.Level == 2) l2TotalKB += cache.Size / 1024;
+            else if (cache.Level == 3) l3TotalKB = cache.Size / 1024; // L3 geralmente é compartilhado
         }
     }
 
     free(info);
 
-    snprintf(buffer, sizeof(buffer), "L1 Cache: %u KB", l1Total);
+    // Exibir L1
+    if (l1TotalKB >= 1024)
+        snprintf(buffer, sizeof(buffer), "L1 Cache: %.1f MB", l1TotalKB / 1024.0f);
+    else
+        snprintf(buffer, sizeof(buffer), "L1 Cache: %u KB", l1TotalKB);
     SetWindowText(cpuControls.hCacheL1, buffer);
-    snprintf(buffer, sizeof(buffer), "L2 Cache: %u KB", l2Total);
+
+    // Exibir L2
+    if (l2TotalKB >= 1024)
+        snprintf(buffer, sizeof(buffer), "L2 Cache: %.1f MB", l2TotalKB / 1024.0f);
+    else
+        snprintf(buffer, sizeof(buffer), "L2 Cache: %u KB", l2TotalKB);
     SetWindowText(cpuControls.hCacheL2, buffer);
-    snprintf(buffer, sizeof(buffer), "L3 Cache: %.1f MB", (float)l3Total);
+
+    // Exibir L3
+    if (l3TotalKB >= 1024)
+        snprintf(buffer, sizeof(buffer), "L3 Cache: %.1f MB", l3TotalKB / 1024.0f);
+    else
+        snprintf(buffer, sizeof(buffer), "L3 Cache: %u KB", l3TotalKB);
     SetWindowText(cpuControls.hCacheL3, buffer);
 }
 
