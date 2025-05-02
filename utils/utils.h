@@ -4,6 +4,7 @@
 #include "..\config.h"
 
 HFONT CreateFontForControl();
-void CenterWindow(HWND hwnd, int windowWidth, int windowHeight);
+void CenterWindowRelativeToParent(HWND hwnd, int windowWidth, int windowHeight);
+void CenterWindowToScreen(HWND hwnd, int windowWidth, int windowHeight);
 
 #endif // UTILS_H

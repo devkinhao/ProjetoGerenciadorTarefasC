@@ -6,7 +6,23 @@ HFONT CreateFontForControl() {
                       DEFAULT_QUALITY, DEFAULT_PITCH | FF_DONTCARE, "Segoe UI");
 }
 
-void CenterWindow(HWND hwnd, int windowWidth, int windowHeight) {
+void CenterWindowRelativeToParent(HWND hwnd, int windowWidth, int windowHeight) {
+    HWND hwndParent = GetParent(hwnd);
+    RECT parentRect;
+
+    if (hwndParent && GetWindowRect(hwndParent, &parentRect)) {
+        int parentWidth  = parentRect.right  - parentRect.left;
+        int parentHeight = parentRect.bottom - parentRect.top;
+
+        int posX = parentRect.left + (parentWidth  - windowWidth)  / 2;
+        int posY = parentRect.top  + (parentHeight - windowHeight) / 2;
+
+        SetWindowPos(hwnd, HWND_TOP, posX, posY, 0, 0, SWP_NOSIZE);
+    }
+}
+
+
+void CenterWindowToScreen(HWND hwnd, int windowWidth, int windowHeight) {
     RECT rect;
     SystemParametersInfo(SPI_GETWORKAREA, 0, &rect, 0);
 

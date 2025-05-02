@@ -2,6 +2,8 @@
 #include "../utils/utils.h"
 #include "../hardware/hardware.h"
 
+static HWND* checkboxes = NULL;
+
 void AddTabs(HWND hwndParent) {
     hTab = CreateWindowEx(0, WC_TABCONTROL, "",
         WS_CHILD | WS_VISIBLE,
@@ -73,86 +75,165 @@ void CleanupResources() {
     if (hFontButton) DeleteObject(hFontButton);
 }
 
-// Criação de tela modal para afinidade de CPU
-void ShowAffinityDialog(HWND hwndParent, HANDLE hProcess) {
-    DWORD_PTR processAffinity, systemAffinity;
-    if (!GetProcessAffinityMask(hProcess, &processAffinity, &systemAffinity)) {
-        MessageBox(hwndParent, "Error getting affinity", "Error", MB_OK | MB_ICONERROR);
-        return;
-    }
-
-    HWND hDlg = CreateWindowEx(WS_EX_DLGMODALFRAME, "STATIC", "Set Affinity",
-        WS_POPUPWINDOW | WS_CAPTION | WS_SYSMENU,
-        300, 200, 300, 100 + 30 * numProcessors,
-        hwndParent, NULL, GetModuleHandle(NULL), NULL);
-
-    HWND* checkboxes = malloc(sizeof(HWND) * numProcessors);
+// Função para atualizar o estado do botão OK
+void UpdateOkButtonState(HWND hDlg, HWND hOk) {
+    BOOL enableOk = FALSE;
     for (int i = 0; i < numProcessors; i++) {
-        char label[32];
-        snprintf(label, sizeof(label), "CPU %d", i);
-        checkboxes[i] = CreateWindow("BUTTON", label,
-            WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
-            20, 20 + i * 30, 100, 25,
-            hDlg, (HMENU)(uintptr_t)(1000 + i), GetModuleHandle(NULL), NULL);
-
-        if (processAffinity & ((DWORD_PTR)1 << i)) {
-            SendMessage(checkboxes[i], BM_SETCHECK, BST_CHECKED, 0);
+        if (SendMessage(checkboxes[i], BM_GETCHECK, 0, 0) == BST_CHECKED) {
+            enableOk = TRUE;
+            break;
         }
     }
 
-    HWND hOk = CreateWindow("BUTTON", "OK",
-        WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON,
-        140, 30 * numProcessors + 30, 60, 25,
-        hDlg, (HMENU)9999, GetModuleHandle(NULL), NULL);
+    // Habilitar/Desabilitar o botão OK
+    EnableWindow(hOk, enableOk);
+}
 
-    HWND hCancel = CreateWindow("BUTTON", "Cancel",
-        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-        210, 30 * numProcessors + 30, 70, 25,
-        hDlg, (HMENU)9998, GetModuleHandle(NULL), NULL);
+// Função de Callback para a janela de diálogo (modal)
+INT_PTR CALLBACK AffinityDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam) {
+    static HANDLE hProcess;
+    static HWND hAllProcessors;
+    static HWND hOk;
+    static char processName[MAX_PATH];
 
-    ShowWindow(hDlg, SW_SHOW);
-    UpdateWindow(hDlg);
+    switch (message) {
+        case WM_INITDIALOG: {
+            // Se lParam é um struct, adapte aqui.
+            hProcess = (HANDLE)lParam;
+            GetWindowTextA(hDlg, processName, sizeof(processName)); // OU receba corretamente por lParam
 
-    MSG msg;
-    BOOL running = TRUE;
-    while (running && GetMessage(&msg, NULL, 0, 0)) {
-        if (!IsDialogMessage(hDlg, &msg)) {
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
+            DWORD_PTR processAffinity, systemAffinity;
+            if (!GetProcessAffinityMask(hProcess, &processAffinity, &systemAffinity)) {
+                MessageBox(hDlg, "Error getting affinity", "Error", MB_OK | MB_ICONERROR);
+                EndDialog(hDlg, 0);
+                return FALSE;
+            }
+
+            HFONT hFont = CreateFontForControl();
+
+            // Label com nome do processo
+            char labelText[256];
+            snprintf(labelText, sizeof(labelText), "Which processors are allowed to run \"%s\"?", processName);
+            HWND hLabel = CreateWindow("STATIC", labelText, WS_CHILD | WS_VISIBLE | SS_LEFT, 10, 10, 260, 30, hDlg, NULL, GetModuleHandle(NULL), NULL);
+            SendMessage(hLabel, WM_SETFONT, (WPARAM)hFont, TRUE);
+
+            // "<All Processors>" checkbox
+            hAllProcessors = CreateWindow("BUTTON", "<All Processors>", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 20, 50, 150, 25, hDlg, (HMENU)1000, GetModuleHandle(NULL), NULL);
+            SendMessage(hAllProcessors, WM_SETFONT, (WPARAM)hFont, TRUE);
+
+            // Checkboxes por CPU
+            checkboxes = malloc(sizeof(HWND) * numProcessors);
+            BOOL allChecked = TRUE;
+            for (int i = 0; i < numProcessors; i++) {
+                char label[32];
+                snprintf(label, sizeof(label), "CPU %d", i);
+                checkboxes[i] = CreateWindow("BUTTON", label, WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
+                    20, 80 + i * 30, 100, 25, hDlg, (HMENU)(UINT_PTR)(1001 + i), GetModuleHandle(NULL), NULL);       
+                SendMessage(checkboxes[i], WM_SETFONT, (WPARAM)hFont, TRUE);
+
+                if (processAffinity & ((DWORD_PTR)1 << i)) {
+                    SendMessage(checkboxes[i], BM_SETCHECK, BST_CHECKED, 0);
+                } else {
+                    allChecked = FALSE;
+                }
+            }
+            // Marcar <All Processors> se todas estão marcadas
+            SendMessage(hAllProcessors, BM_SETCHECK, allChecked ? BST_CHECKED : BST_UNCHECKED, 0);
+
+            // Tamanho dos botões
+            int buttonWidth = 60;
+            int buttonHeight = 25;
+            int buttonSpacing = 10;
+
+            // Posição Y: 10 pixels acima do fundo
+            RECT clientRect;
+            GetClientRect(hDlg, &clientRect);
+            int y = clientRect.bottom - buttonHeight - 10;
+
+            // Posição X centralizada
+            int totalWidth = buttonWidth * 2 + buttonSpacing;
+            int xOk = (clientRect.right - totalWidth) / 2;
+            int xCancel = xOk + buttonWidth + buttonSpacing;
+
+            hOk = CreateWindow("BUTTON", "OK", WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON | WS_DISABLED,
+                xOk, y, buttonWidth, buttonHeight, hDlg, (HMENU)9999, GetModuleHandle(NULL), NULL);
+            HWND hCancel = CreateWindow("BUTTON", "Cancel", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+                xCancel, y, buttonWidth, buttonHeight, hDlg, (HMENU)9998, GetModuleHandle(NULL), NULL);
+            
+            SendMessage(hOk, WM_SETFONT, (WPARAM)hFont, TRUE);
+            SendMessage(hCancel, WM_SETFONT, (WPARAM)hFont, TRUE);
+
+            UpdateOkButtonState(hDlg, hOk);
+
+            // Centraliza a janela
+            RECT rc;
+            GetWindowRect(hDlg, &rc);
+            int width = rc.right - rc.left;
+            int height = rc.bottom - rc.top;
+            CenterWindowRelativeToParent(hDlg, width, height);
+
+            return TRUE;
         }
 
-        if (msg.message == WM_COMMAND) {
-            int wmId = LOWORD(msg.wParam);
-            if (wmId == 9999) { // OK
+        case WM_COMMAND: {
+            int wmId = LOWORD(wParam);
+
+            if (wmId == 1000) { // "<All Processors>"
+                BOOL check = (SendMessage(hAllProcessors, BM_GETCHECK, 0, 0) == BST_CHECKED);
+                for (int i = 0; i < numProcessors; i++) {
+                    SendMessage(checkboxes[i], BM_SETCHECK, check ? BST_CHECKED : BST_UNCHECKED, 0);
+                }
+                UpdateOkButtonState(hDlg, hOk);
+
+            } else if (wmId >= 1001 && wmId < 1001 + numProcessors) { // CPUs individuais
+                // Atualiza <All Processors> com base nos checkboxes
+                BOOL allCheckedNow = TRUE;
+                for (int i = 0; i < numProcessors; i++) {
+                    if (SendMessage(checkboxes[i], BM_GETCHECK, 0, 0) != BST_CHECKED) {
+                        allCheckedNow = FALSE;
+                        break;
+                    }
+                }
+                SendMessage(hAllProcessors, BM_SETCHECK, allCheckedNow ? BST_CHECKED : BST_UNCHECKED, 0);
+                UpdateOkButtonState(hDlg, hOk);
+
+            } else if (wmId == 9999) { // OK
                 DWORD_PTR newMask = 0;
                 for (int i = 0; i < numProcessors; i++) {
                     if (SendMessage(checkboxes[i], BM_GETCHECK, 0, 0) == BST_CHECKED) {
                         newMask |= ((DWORD_PTR)1 << i);
                     }
                 }
+
                 if (newMask == 0) {
-                    MessageBox(hwndParent, "Select at least one CPU", "Warning", MB_OK | MB_ICONWARNING);
+                    MessageBox(hDlg, "Select at least one CPU", "Warning", MB_OK | MB_ICONWARNING);
                 } else {
                     if (!SetProcessAffinityMask(hProcess, newMask)) {
-                        MessageBox(hwndParent, "Error setting affinitty", "Error", MB_OK | MB_ICONERROR);
+                        MessageBox(hDlg, "Error setting affinity", "Error", MB_OK | MB_ICONERROR);
                     } else {
-                        MessageBox(hwndParent, "Affinity set successfully!", "Success", MB_OK | MB_ICONINFORMATION);
-                        running = FALSE;
+                        MessageBox(hDlg, "Affinity set successfully!", "Success", MB_OK | MB_ICONINFORMATION);
+                        EndDialog(hDlg, 1);
                     }
                 }
-            } else if (wmId == 9998) { // Cancelar
-                running = FALSE;
+
+            } else if (wmId == 9998) { // Cancel
+                EndDialog(hDlg, 0);
             }
-        } else if (msg.message == WM_CLOSE) {
-            running = FALSE;
+            break;
         }
+
+        case WM_CLOSE:
+            EndDialog(hDlg, 0);
+            break;
     }
 
-    for (int i = 0; i < numProcessors; i++) {
-        DestroyWindow(checkboxes[i]);
-    }
-    free(checkboxes);
-    DestroyWindow(hDlg);
+    return FALSE;
+}
+
+// Função principal para mostrar a janela de afinidade
+void ShowAffinityDialog(HWND hwndParent, HANDLE hProcess, const char* processName) {
+    // Janela de diálogo modal
+    DialogBoxParam(GetModuleHandle(NULL), MAKEINTRESOURCE(101), hwndParent, AffinityDialogProc, (LPARAM)hProcess);
 }
 
 void ShowContextMenu(HWND hwndListView, HWND hwndParent, POINT pt) {
@@ -174,6 +255,16 @@ void ShowContextMenu(HWND hwndListView, HWND hwndParent, POINT pt) {
         MessageBox(hwndParent, "Unable to open process", "Error", MB_OK | MB_ICONERROR);
         return;
     }
+
+    // Obter o nome do processo (subitem 0, por exemplo)
+    char processName[MAX_PATH] = {0};
+    LVITEM nameItem = {0};
+    nameItem.iSubItem = 0;
+    nameItem.iItem = selectedIndex;
+    nameItem.mask = LVIF_TEXT;
+    nameItem.pszText = processName;
+    nameItem.cchTextMax = sizeof(processName);
+    ListView_GetItem(hwndListView, &nameItem);
 
     DWORD currentPriority = GetPriorityClass(hProcess);
 
@@ -209,7 +300,7 @@ void ShowContextMenu(HWND hwndListView, HWND hwndParent, POINT pt) {
             MessageBox(hwndParent, "Failed to set priority", "Error", MB_OK | MB_ICONERROR);
         }
     } else if (cmd == 2) {
-        ShowAffinityDialog(hwndParent, hProcess);
+        ShowAffinityDialog(hwndParent, hProcess, processName);
     }
 
     CloseHandle(hProcess);

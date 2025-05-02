@@ -116,7 +116,7 @@ int main() {
 
     InitializeSystemInfo();
     // Centraliza a janela
-    CenterWindow(hwnd, WINDOW_WIDTH, WINDOW_HEIGHT);
+    CenterWindowToScreen(hwnd, WINDOW_WIDTH, WINDOW_HEIGHT);
 
     ShowWindow(hwnd, SW_SHOW);
     UpdateWindow(hwnd);

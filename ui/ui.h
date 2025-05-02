@@ -9,7 +9,9 @@ void AddFooter(HWND hwndParent);
 void SetupTimer(HWND hwnd);
 void OnTabSelectionChanged(HWND hwndParent, int selectedTab);
 void CleanupResources();
-void ShowAffinityDialog(HWND hwndParent, HANDLE hProcess);
+void UpdateOkButtonState(HWND hDlg, HWND hOk);
+INT_PTR CALLBACK AffinityDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
+void ShowAffinityDialog(HWND hwndParent, HANDLE hProcess, const char* processName);
 void ShowContextMenu(HWND hwndListView, HWND hwndParent, POINT pt);
 
 
