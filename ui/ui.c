@@ -108,28 +108,64 @@ INT_PTR CALLBACK AffinityDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPAR
 
             HFONT hFont = CreateFontForControl();
 
-            // Label com nome do processo - ajustando largura para (largura da janela - 10)
-            RECT rcDialog;
-            GetClientRect(hDlg, &rcDialog); // Obtém o tamanho da área cliente da janela
+            // Obter tamanho da área cliente
+            RECT rcClient;
+            GetClientRect(hDlg, &rcClient);
+            int clientWidth = rcClient.right - rcClient.left;
+            int clientHeight = rcClient.bottom - rcClient.top;
 
             // Label com nome do processo
             char labelText[256];
             snprintf(labelText, sizeof(labelText), "Which processors are allowed to run \"%s\"?", params->processName);
-            HWND hLabel = CreateWindow("STATIC", labelText, WS_CHILD | WS_VISIBLE | SS_LEFT, 10, 10, rcDialog.right - rcDialog.left - 10, 30, hDlg, NULL, GetModuleHandle(NULL), NULL);
+            HWND hLabel = CreateWindow("STATIC", labelText, WS_CHILD | WS_VISIBLE | SS_LEFT, 
+                                      10, 10, clientWidth - 20, 30, hDlg, NULL, GetModuleHandle(NULL), NULL);
             SendMessage(hLabel, WM_SETFONT, (WPARAM)hFont, TRUE);
 
             // "<All Processors>" checkbox
-            hAllProcessors = CreateWindow("BUTTON", "<All Processors>", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 20, 50, 150, 25, hDlg, (HMENU)1000, GetModuleHandle(NULL), NULL);
+            hAllProcessors = CreateWindow("BUTTON", "<All Processors>", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 
+                                         20, 50, 150, 25, hDlg, (HMENU)1000, GetModuleHandle(NULL), NULL);
             SendMessage(hAllProcessors, WM_SETFONT, (WPARAM)hFont, TRUE);
+
+            // Calcular layout das checkboxes
+            int maxHeight = 200;  // Altura máxima desejada para as checkboxes
+            int checkboxHeight = 20;
+            int checkboxWidth = 100;
+            int startY = 80;
+            int startX = 20;
+            int marginRight = 20;
+            
+            // Calcular quantas linhas cabem na altura máxima
+            int rowsPerColumn = (maxHeight - (startY - 50)) / checkboxHeight;
+            if (rowsPerColumn < 1) rowsPerColumn = 1;
+            
+            // Calcular quantas colunas serão necessárias
+            int numColumns = (numProcessors + rowsPerColumn - 1) / rowsPerColumn;
+            if (numColumns < 1) numColumns = 1;
+            
+            // Ajustar largura da checkbox se necessário para caber na janela
+            int availableWidth = clientWidth - startX - marginRight;
+            if ((numColumns * checkboxWidth) > availableWidth) {
+                checkboxWidth = availableWidth / numColumns;
+                if (checkboxWidth < 60) checkboxWidth = 60; // Largura mínima
+            }
 
             // Checkboxes por CPU
             checkboxes = malloc(sizeof(HWND) * numProcessors);
             BOOL allChecked = TRUE;
+            
+            int currentColumn = 0;
+            int currentRow = 0;
+            
             for (int i = 0; i < numProcessors; i++) {
                 char label[32];
                 snprintf(label, sizeof(label), "CPU %d", i);
+                
+                int x = startX + (currentColumn * checkboxWidth);
+                int y = startY + (currentRow * checkboxHeight);
+                
                 checkboxes[i] = CreateWindow("BUTTON", label, WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
-                    20, 70 + i * 20, 100, 25, hDlg, (HMENU)(UINT_PTR)(1001 + i), GetModuleHandle(NULL), NULL);       
+                    x, y, checkboxWidth - 10, checkboxHeight, hDlg, (HMENU)(UINT_PTR)(1001 + i), GetModuleHandle(NULL), NULL);
+                
                 SendMessage(checkboxes[i], WM_SETFONT, (WPARAM)hFont, TRUE);
 
                 if (processAffinity & ((DWORD_PTR)1 << i)) {
@@ -137,41 +173,35 @@ INT_PTR CALLBACK AffinityDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPAR
                 } else {
                     allChecked = FALSE;
                 }
+                
+                // Avançar para a próxima posição
+                currentRow++;
+                if (currentRow >= rowsPerColumn) {
+                    currentRow = 0;
+                    currentColumn++;
+                }
             }
+
             // Marcar <All Processors> se todas estão marcadas
             SendMessage(hAllProcessors, BM_SETCHECK, allChecked ? BST_CHECKED : BST_UNCHECKED, 0);
 
-            // Tamanho dos botões
+            // Posicionar botões OK/Cancel
             int buttonWidth = 60;
             int buttonHeight = 25;
             int buttonSpacing = 10;
-
-            // Posição Y: 10 pixels acima do fundo
-            RECT clientRect;
-            GetClientRect(hDlg, &clientRect);
-            int y = clientRect.bottom - buttonHeight - 10;
-
-            // Posição X centralizada
-            int totalWidth = buttonWidth * 2 + buttonSpacing;
-            int xOk = (clientRect.right - totalWidth) / 2;
-            int xCancel = xOk + buttonWidth + buttonSpacing;
+            int buttonsY = clientHeight - buttonHeight - 10;
+            int totalButtonsWidth = buttonWidth * 2 + buttonSpacing;
+            int buttonsX = (clientWidth - totalButtonsWidth) / 2;
 
             hOk = CreateWindow("BUTTON", "OK", WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON | WS_DISABLED,
-                xOk, y, buttonWidth, buttonHeight, hDlg, (HMENU)9999, GetModuleHandle(NULL), NULL);
+                buttonsX, buttonsY, buttonWidth, buttonHeight, hDlg, (HMENU)9999, GetModuleHandle(NULL), NULL);
             HWND hCancel = CreateWindow("BUTTON", "Cancel", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-                xCancel, y, buttonWidth, buttonHeight, hDlg, (HMENU)9998, GetModuleHandle(NULL), NULL);
+                buttonsX + buttonWidth + buttonSpacing, buttonsY, buttonWidth, buttonHeight, hDlg, (HMENU)9998, GetModuleHandle(NULL), NULL);
             
             SendMessage(hOk, WM_SETFONT, (WPARAM)hFont, TRUE);
             SendMessage(hCancel, WM_SETFONT, (WPARAM)hFont, TRUE);
 
             UpdateOkButtonState(hDlg, hOk);
-
-            // Centraliza a janela
-            RECT rc;
-            GetWindowRect(hDlg, &rc);
-            int width = rc.right - rc.left;
-            int height = rc.bottom - rc.top;
-            CenterWindowRelativeToParent(hDlg, width, height);
 
             return TRUE;
         }
