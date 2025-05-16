@@ -205,11 +205,11 @@ void UpdateDiskInfo(HWND hDiskLabel) {
 
                 if (volumeName[0]) {
                     snprintf(temp, sizeof(temp),
-                        "Disco %c (%s): %.2f GB livre / %.2f GB total\n",
+                        "Disco %c (%s): %.2f GB free / %.2f GB total\n",
                         letter, volumeName, freeGB, totalGB);
                 } else {
                     snprintf(temp, sizeof(temp),
-                        "Disco %c: %.2f GB livre / %.2f GB total\n",
+                        "Disco %c: %.2f GB free / %.2f GB total\n",
                         letter, freeGB, totalGB);
                 }
 
