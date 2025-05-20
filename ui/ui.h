@@ -6,6 +6,7 @@
 typedef struct {
     HANDLE hProcess;
     char processName[MAX_PATH];
+    DWORD pid;
 } AffinityDialogParams;
 
 void AddTabs(HWND hwndParent);
@@ -17,6 +18,8 @@ void CleanupResources();
 void UpdateOkButtonState(HWND hDlg, HWND hOk);
 INT_PTR CALLBACK AffinityDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 void ShowAffinityDialog(HWND hwndParent, HANDLE hProcess, const char* processName);
+INT_PTR CALLBACK ShowProcessDetailsDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
+void ShowProcessDetailsDialog(HWND hwndParent, HANDLE hProcess, const char* processName, DWORD pid);
 void ShowContextMenu(HWND hwndListView, HWND hwndParent, POINT pt);
 
 

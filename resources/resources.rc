@@ -7,3 +7,12 @@ FONT 8, "MS Shell Dlg"
 BEGIN
     // Nenhum controle aqui, tudo será criado no WM_INITDIALOG
 END
+
+102 DIALOGEX 0, 0, 230, 190
+STYLE DS_SETFONT | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Process Details"
+FONT 8, "MS Shell Dlg"
+BEGIN
+    // Controles serão criados em tempo de execução
+END
+
