@@ -276,6 +276,61 @@ INT_PTR CALLBACK ShowProcessDetailsDialogProc(HWND hDlg, UINT message, WPARAM wP
     static HANDLE hProcess;
     static char processName[MAX_PATH];
     static DWORD pid;
+    static HWND hLabelMemory, hLabelCpuTime, hLabelIO, hLabelThreads, hLabelHandles;
+
+    void UpdateDynamicLabels() {
+        char buf[128];
+
+        // Memória
+        PROCESS_MEMORY_COUNTERS pmc;
+        if (GetProcessMemoryInfo(hProcess, &pmc, sizeof(pmc))) {
+            double memMB = pmc.WorkingSetSize / (1024.0 * 1024.0);
+            snprintf(buf, sizeof(buf), "Memory: %.1f MB", memMB);
+            SetWindowText(hLabelMemory, buf);
+        }
+
+        // CPU Time
+        FILETIME ftCreate, ftExit, ftKernel, ftUser;
+        if (GetProcessTimes(hProcess, &ftCreate, &ftExit, &ftKernel, &ftUser)) {
+            ULONGLONG total = ((ULONGLONG)ftKernel.dwHighDateTime << 32 | ftKernel.dwLowDateTime) +
+                              ((ULONGLONG)ftUser.dwHighDateTime << 32 | ftUser.dwLowDateTime);
+            DWORD sec = (DWORD)(total / 10000000);
+            DWORD min = sec / 60; sec %= 60;
+            snprintf(buf, sizeof(buf), "CPU Time: %02lu:%02lu", min, sec);
+            SetWindowText(hLabelCpuTime, buf);
+        }
+
+        // I/O
+        IO_COUNTERS io;
+        if (GetProcessIoCounters(hProcess, &io)) {
+            double r = io.ReadTransferCount / (1024.0 * 1024.0);
+            double w = io.WriteTransferCount / (1024.0 * 1024.0);
+            snprintf(buf, sizeof(buf), "Total I/O: %.1f MB read / %.1f MB written", r, w);
+            SetWindowText(hLabelIO, buf);
+        }
+
+        // Threads
+        DWORD threads = 0;
+        HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+        if (snap != INVALID_HANDLE_VALUE) {
+            THREADENTRY32 te = { .dwSize = sizeof(te) };
+            if (Thread32First(snap, &te)) {
+                do {
+                    if (te.th32OwnerProcessID == pid) threads++;
+                } while (Thread32Next(snap, &te));
+            }
+            CloseHandle(snap);
+        }
+        snprintf(buf, sizeof(buf), "Threads: %lu", threads);
+        SetWindowText(hLabelThreads, buf);
+
+        // Handles
+        DWORD count;
+        if (GetProcessHandleCount(hProcess, &count)) {
+            snprintf(buf, sizeof(buf), "Handles: %lu", count);
+            SetWindowText(hLabelHandles, buf);
+        }
+    }
 
     switch (message) {
     case WM_INITDIALOG: {
@@ -283,7 +338,6 @@ INT_PTR CALLBACK ShowProcessDetailsDialogProc(HWND hDlg, UINT message, WPARAM wP
         pid = ((AffinityDialogParams*)lParam)->pid;
         strncpy(processName, ((AffinityDialogParams*)lParam)->processName, MAX_PATH);
 
-        char buffer[2048];
         char fullPath[MAX_PATH] = "Unknown";
         char description[256] = "Unknown";
         char company[256] = "Unknown";
@@ -295,7 +349,7 @@ INT_PTR CALLBACK ShowProcessDetailsDialogProc(HWND hDlg, UINT message, WPARAM wP
             GetModuleFileNameEx(hProcess, hMod, fullPath, sizeof(fullPath));
         }
 
-        // Obter descrição e empresa do executável
+        // Descrição e empresa
         DWORD verHandle = 0;
         DWORD verSize = GetFileVersionInfoSize(fullPath, &verHandle);
         if (verSize > 0) {
@@ -329,62 +383,6 @@ INT_PTR CALLBACK ShowProcessDetailsDialogProc(HWND hDlg, UINT message, WPARAM wP
             free(verData);
         }
 
-        // Memória
-        PROCESS_MEMORY_COUNTERS pmc;
-        GetProcessMemoryInfo(hProcess, &pmc, sizeof(pmc));
-        double memMB = pmc.WorkingSetSize / (1024.0 * 1024.0);
-
-        // Prioridade
-        DWORD priority = GetPriorityClass(hProcess);
-        const char* priorityStr = "Unknown";
-        switch (priority) {
-            case IDLE_PRIORITY_CLASS: priorityStr = "Idle"; break;
-            case BELOW_NORMAL_PRIORITY_CLASS: priorityStr = "Below Normal"; break;
-            case NORMAL_PRIORITY_CLASS: priorityStr = "Normal"; break;
-            case ABOVE_NORMAL_PRIORITY_CLASS: priorityStr = "Above Normal"; break;
-            case HIGH_PRIORITY_CLASS: priorityStr = "High"; break;
-            case REALTIME_PRIORITY_CLASS: priorityStr = "Realtime"; break;
-        }
-
-        // Tempo de início
-        FILETIME ftCreate, ftExit, ftKernel, ftUser;
-        SYSTEMTIME stUTC, stLocal;
-        char timeStr[64] = "Unavailable";
-        if (GetProcessTimes(hProcess, &ftCreate, &ftExit, &ftKernel, &ftUser)) {
-            FileTimeToSystemTime(&ftCreate, &stUTC);
-            SystemTimeToTzSpecificLocalTime(NULL, &stUTC, &stLocal);
-            snprintf(timeStr, sizeof(timeStr), "%02d/%02d/%04d %02d:%02d:%02d",
-                stLocal.wDay, stLocal.wMonth, stLocal.wYear,
-                stLocal.wHour, stLocal.wMinute, stLocal.wSecond);
-        }
-
-        // Threads
-        DWORD threadCount = 0;
-        HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
-        if (hSnapshot != INVALID_HANDLE_VALUE) {
-            THREADENTRY32 te = { .dwSize = sizeof(te) };
-            if (Thread32First(hSnapshot, &te)) {
-                do {
-                    if (te.th32OwnerProcessID == pid)
-                        threadCount++;
-                } while (Thread32Next(hSnapshot, &te));
-            }
-            CloseHandle(hSnapshot);
-        }
-
-        // I/O acumulado
-        IO_COUNTERS io;
-        GetProcessIoCounters(hProcess, &io);
-        double ioReadMB = io.ReadTransferCount / (1024.0 * 1024.0);
-        double ioWriteMB = io.WriteTransferCount / (1024.0 * 1024.0);
-
-        // CPU total usado
-        ULONGLONG totalCpuTime = ((ULONGLONG)ftKernel.dwHighDateTime << 32 | ftKernel.dwLowDateTime) +
-                                 ((ULONGLONG)ftUser.dwHighDateTime << 32 | ftUser.dwLowDateTime);
-        DWORD cpuSec = (DWORD)(totalCpuTime / 10000000);
-        DWORD cpuMin = cpuSec / 60;
-        cpuSec %= 60;
-
         // Bitness
         BOOL isWow64 = FALSE;
         IsWow64Process(hProcess, &isWow64);
@@ -398,59 +396,78 @@ INT_PTR CALLBACK ShowProcessDetailsDialogProc(HWND hDlg, UINT message, WPARAM wP
     #endif
         const char* bitness = is64BitProcess ? "64-bit" : "32-bit";
 
-        // Handles
-        DWORD handleCount = 0;
-        GetProcessHandleCount(hProcess, &handleCount);
-
-        // Obter tamanho da área cliente
+        // Tamanho da área cliente
         RECT rcClient;
         GetClientRect(hDlg, &rcClient);
         int clientWidth = rcClient.right - rcClient.left;
-        int clientHeight = rcClient.bottom - rcClient.top;
-
-        // Montar texto
-        snprintf(buffer, sizeof(buffer),
-            "Process: %s\n"
-            "Description: %s\n"
-            "Company: %s\n"
-            "PID: %lu\n"
-            "Full Path: %s\n"
-            "Bitness: %s\n"
-            "Memory (working set): %.1f MB\n"
-            "Priority: %s\n"
-            "Threads: %lu\n"
-            "Handles: %lu\n"
-            "Start Time: %s\n"
-            "CPU Time: %02lu:%02lu\n"
-            "Total I/O: %.1f MB read / %.1f MB written",
-            processName, description, company, pid, fullPath, bitness,
-            memMB, priorityStr, threadCount, handleCount, timeStr, cpuMin, cpuSec, ioReadMB, ioWriteMB);
-
-        // Criar label
-        HWND hLabel = CreateWindow("STATIC", buffer, WS_CHILD | WS_VISIBLE | SS_LEFT,
-            10, 10, clientWidth - 20, clientHeight - 50, hDlg, NULL, GetModuleHandle(NULL), NULL);
+        int y = 10;
 
         HFONT hFont = CreateFontForControl();
-        SendMessage(hLabel, WM_SETFONT, (WPARAM)hFont, TRUE);
+
+        // Campos estáticos
+        char buffer[512];
+        snprintf(buffer, sizeof(buffer), "Process: %s", processName);
+        HWND hStaticName = CreateWindow("STATIC", buffer, WS_CHILD | WS_VISIBLE | SS_LEFT,
+            10, y, clientWidth - 20, 20, hDlg, NULL, GetModuleHandle(NULL), NULL);
+        SendMessage(hStaticName, WM_SETFONT, (WPARAM)hFont, TRUE); y += 22;
+
+        snprintf(buffer, sizeof(buffer), "Description: %s", description);
+        HWND hStaticDesc = CreateWindow("STATIC", buffer, WS_CHILD | WS_VISIBLE | SS_LEFT,
+            10, y, clientWidth - 20, 20, hDlg, NULL, GetModuleHandle(NULL), NULL);
+        SendMessage(hStaticDesc, WM_SETFONT, (WPARAM)hFont, TRUE); y += 22;
+
+        snprintf(buffer, sizeof(buffer), "Company: %s", company);
+        HWND hStaticComp = CreateWindow("STATIC", buffer, WS_CHILD | WS_VISIBLE | SS_LEFT,
+            10, y, clientWidth - 20, 20, hDlg, NULL, GetModuleHandle(NULL), NULL);
+        SendMessage(hStaticComp, WM_SETFONT, (WPARAM)hFont, TRUE); y += 30;
+
+        // Campos dinâmicos
+        hLabelMemory = CreateWindow("STATIC", "", WS_CHILD | WS_VISIBLE | SS_LEFT,
+            10, y, clientWidth - 20, 20, hDlg, NULL, GetModuleHandle(NULL), NULL); y += 22;
+        hLabelCpuTime = CreateWindow("STATIC", "", WS_CHILD | WS_VISIBLE | SS_LEFT,
+            10, y, clientWidth - 20, 20, hDlg, NULL, GetModuleHandle(NULL), NULL); y += 22;
+        hLabelIO = CreateWindow("STATIC", "", WS_CHILD | WS_VISIBLE | SS_LEFT,
+            10, y, clientWidth - 20, 20, hDlg, NULL, GetModuleHandle(NULL), NULL); y += 22;
+        hLabelThreads = CreateWindow("STATIC", "", WS_CHILD | WS_VISIBLE | SS_LEFT,
+            10, y, clientWidth - 20, 20, hDlg, NULL, GetModuleHandle(NULL), NULL); y += 22;
+        hLabelHandles = CreateWindow("STATIC", "", WS_CHILD | WS_VISIBLE | SS_LEFT,
+            10, y, clientWidth - 20, 20, hDlg, NULL, GetModuleHandle(NULL), NULL); y += 30;
+
+        SendMessage(hLabelMemory, WM_SETFONT, (WPARAM)hFont, TRUE);
+        SendMessage(hLabelCpuTime, WM_SETFONT, (WPARAM)hFont, TRUE);
+        SendMessage(hLabelIO, WM_SETFONT, (WPARAM)hFont, TRUE);
+        SendMessage(hLabelThreads, WM_SETFONT, (WPARAM)hFont, TRUE);
+        SendMessage(hLabelHandles, WM_SETFONT, (WPARAM)hFont, TRUE);
 
         // Botão "Close" centralizado
-        int buttonWidth = 80;
-        int buttonHeight = 25;
+        int buttonWidth = 80, buttonHeight = 25;
         int buttonX = (clientWidth - buttonWidth) / 2;
-        int buttonY = clientHeight - buttonHeight - 10;
+        int buttonY = rcClient.bottom - buttonHeight - 10;
 
         HWND hClose = CreateWindow("BUTTON", "Close", WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON,
             buttonX, buttonY, buttonWidth, buttonHeight, hDlg, (HMENU)IDOK, GetModuleHandle(NULL), NULL);
         SendMessage(hClose, WM_SETFONT, (WPARAM)hFont, TRUE);
-
+        UpdateDynamicLabels();
+        SetTimer(hDlg, 1, 1000, NULL);
         return TRUE;
+    }
+
+    case WM_TIMER: {
+        UpdateDynamicLabels();
+        break;
     }
 
     case WM_COMMAND:
         if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL) {
+            KillTimer(hDlg, 1);
             EndDialog(hDlg, 0);
             return TRUE;
         }
+        break;
+
+    case WM_CLOSE:
+        KillTimer(hDlg, 1);
+        EndDialog(hDlg, 0);
         break;
     }
 
