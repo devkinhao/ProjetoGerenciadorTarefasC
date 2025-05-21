@@ -35,7 +35,7 @@ void AddListView(HWND hwndParent) {
 
     // Agora temos 7 colunas
     char* columns[] = { "Process Name", "User", "PID", "Status", "CPU (%)", "Memory (MB)", "Disk (MB/s)" };
-    int widths[] = { 200, 99, 70, 100, 80, 100, 100 };
+    int widths[] = { 200, 115, 60, 95, 65, 95, 89 };
 
     for (int i = 0; i < 7; i++) {
         lvc.pszText = columns[i];
@@ -45,14 +45,20 @@ void AddListView(HWND hwndParent) {
 }
 
 void AddFooter(HWND hwndParent) {
+    const int buttonWidth = 85;
+    const int buttonHeight = 22;
+
+    int x = WINDOW_WIDTH - buttonWidth - 15;  
+    int y = WINDOW_HEIGHT - buttonHeight - 40; 
+
     hButtonEndTask = CreateWindowEx(0, "BUTTON", "End Task",
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-        600, 575, 180, 30,
+        x, y, buttonWidth, buttonHeight,
         hwndParent, (HMENU)ID_END_TASK_BUTTON, GetModuleHandle(NULL), NULL);
-
+    
     hFontButton = CreateFontForControl();
-
     SendMessage(hButtonEndTask, WM_SETFONT, (WPARAM)hFontButton, TRUE);
+    EnableWindow(hButtonEndTask, FALSE);
 }
 
 void SetupTimer(HWND hwnd) {
@@ -74,6 +80,11 @@ void OnTabSelectionChanged(HWND hwndParent, int selectedTab) {
 void CleanupResources() {
     if (hFontTabs) DeleteObject(hFontTabs);
     if (hFontButton) DeleteObject(hFontButton);
+}
+
+void UpdateEndTaskButtonState() {
+    int selectedIndex = ListView_GetNextItem(hListView, -1, LVNI_SELECTED);
+    EnableWindow(hButtonEndTask, selectedIndex != -1);
 }
 
 // Função para atualizar o estado do botão OK
@@ -276,7 +287,7 @@ INT_PTR CALLBACK ShowProcessDetailsDialogProc(HWND hDlg, UINT message, WPARAM wP
     static HANDLE hProcess;
     static char processName[MAX_PATH];
     static DWORD pid;
-    static HWND hLabelMemory, hLabelPrivateMemory, hLabelPageFaults, hLabelCpuTime, hLabelIO, hLabelThreads, hLabelHandles;
+    static HWND hLabelPriority, hLabelMemory, hLabelPrivateMemory, hLabelPageFaults, hLabelCpuTime, hLabelIO, hLabelThreads, hLabelHandles;
 
     void UpdateDynamicLabels() {
         char buf[128];
@@ -285,6 +296,20 @@ INT_PTR CALLBACK ShowProcessDetailsDialogProc(HWND hDlg, UINT message, WPARAM wP
         if (GetProcessMemoryInfo(hProcess, (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc))) {
             snprintf(buf, sizeof(buf), "Page Faults: %lu", pmc.PageFaultCount);
             SetWindowText(hLabelPageFaults, buf);
+
+            DWORD prio = GetPriorityClass(hProcess);
+            const char* prioStr;
+            switch(prio) {
+                case IDLE_PRIORITY_CLASS: prioStr = "Low"; break;
+                case BELOW_NORMAL_PRIORITY_CLASS: prioStr = "Below Normal"; break;
+                case NORMAL_PRIORITY_CLASS: prioStr = "Normal"; break;
+                case ABOVE_NORMAL_PRIORITY_CLASS: prioStr = "Above Normal"; break;
+                case HIGH_PRIORITY_CLASS: prioStr = "High"; break;
+                case REALTIME_PRIORITY_CLASS: prioStr = "Realtime"; break;
+                default: prioStr = "Unknown"; break;
+            }
+            snprintf(buf, sizeof(buf), "Priority: %s", prioStr);
+            SetWindowText(hLabelPriority, buf);
 
             double memKB = pmc.WorkingSetSize / 1024.0;
             snprintf(buf, sizeof(buf), "Memory (working set): %.0f K", memKB);
@@ -510,7 +535,7 @@ INT_PTR CALLBACK ShowProcessDetailsDialogProc(HWND hDlg, UINT message, WPARAM wP
         // 🟩 Group Box 2 – Informações dinâmicas
         //
         int dynamicGroupTop = y + 30;
-        int dynamicGroupHeight = 22 * 7 + 20;
+        int dynamicGroupHeight = 22 * 8 + 20;
 
         HWND hGroupDynamic = CreateWindow("BUTTON", "Live Metrics", WS_CHILD | WS_VISIBLE | BS_GROUPBOX,
             margin, dynamicGroupTop - 20, clientWidth - 2 * margin, dynamicGroupHeight, hDlg, NULL, GetModuleHandle(NULL), NULL);
@@ -519,6 +544,8 @@ INT_PTR CALLBACK ShowProcessDetailsDialogProc(HWND hDlg, UINT message, WPARAM wP
         x = margin + groupPadding;
         y = dynamicGroupTop;
 
+        hLabelPriority = CreateWindow("STATIC", "", WS_CHILD | WS_VISIBLE | SS_LEFT,
+        x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL); y += 22; 
         hLabelMemory = CreateWindow("STATIC", "", WS_CHILD | WS_VISIBLE | SS_LEFT,
             x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL); y += 22;
         hLabelPrivateMemory = CreateWindow("STATIC", "", WS_CHILD | WS_VISIBLE | SS_LEFT,
@@ -534,6 +561,7 @@ INT_PTR CALLBACK ShowProcessDetailsDialogProc(HWND hDlg, UINT message, WPARAM wP
         hLabelHandles = CreateWindow("STATIC", "", WS_CHILD | WS_VISIBLE | SS_LEFT,
             x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL); y += 22;
 
+        SendMessage(hLabelPriority, WM_SETFONT, (WPARAM)hFont, TRUE);
         SendMessage(hLabelMemory, WM_SETFONT, (WPARAM)hFont, TRUE);
         SendMessage(hLabelPrivateMemory, WM_SETFONT, (WPARAM)hFont, TRUE);
         SendMessage(hLabelPageFaults, WM_SETFONT, (WPARAM)hFont, TRUE);

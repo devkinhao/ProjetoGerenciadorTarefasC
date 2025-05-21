@@ -21,13 +21,18 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
         SetupTimer(hwnd);
         break;
 
-    case WM_NOTIFY:
-        if (((LPNMHDR)lParam)->idFrom == ID_TAB_CONTROL && ((LPNMHDR)lParam)->code == TCN_SELCHANGE)
-        {
+    case WM_NOTIFY: {
+        LPNMHDR pnmh = (LPNMHDR)lParam;
+
+        if (pnmh->idFrom == ID_TAB_CONTROL && pnmh->code == TCN_SELCHANGE) {
             int selectedTab = TabCtrl_GetCurSel(hTab);
             OnTabSelectionChanged(hwnd, selectedTab);
         }
+        else if (pnmh->idFrom == ID_LIST_VIEW && pnmh->code == LVN_ITEMCHANGED) {
+            UpdateEndTaskButtonState();
+        }
         break;
+    }
 
     case WM_TIMER:
         UpdateProcessList();

@@ -6,13 +6,13 @@
 #define _WIN32_WINNT 0x0501
 
 // Tamanho da janela principal
-#define WINDOW_WIDTH 800
-#define WINDOW_HEIGHT 650
+#define WINDOW_WIDTH 765
+#define WINDOW_HEIGHT 728
 
 // Interface gráfica
 #define FONT_SIZE 16
-#define LISTVIEW_WIDTH 770
-#define LISTVIEW_HEIGHT 520
+#define LISTVIEW_WIDTH 740
+#define LISTVIEW_HEIGHT 615
 
 // Identificadores de controles
 #define ID_TAB_CONTROL     1001

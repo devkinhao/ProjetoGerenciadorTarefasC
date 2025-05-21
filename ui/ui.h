@@ -15,6 +15,7 @@ void AddFooter(HWND hwndParent);
 void SetupTimer(HWND hwnd);
 void OnTabSelectionChanged(HWND hwndParent, int selectedTab);
 void CleanupResources();
+void UpdateEndTaskButtonState();
 void UpdateOkButtonState(HWND hDlg, HWND hOk);
 INT_PTR CALLBACK AffinityDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 void ShowAffinityDialog(HWND hwndParent, HANDLE hProcess, const char* processName);
