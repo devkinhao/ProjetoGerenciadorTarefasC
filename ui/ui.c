@@ -276,17 +276,55 @@ INT_PTR CALLBACK ShowProcessDetailsDialogProc(HWND hDlg, UINT message, WPARAM wP
     static HANDLE hProcess;
     static char processName[MAX_PATH];
     static DWORD pid;
-    static HWND hLabelMemory, hLabelCpuTime, hLabelIO, hLabelThreads, hLabelHandles;
+    static HWND hLabelMemory, hLabelPrivateMemory, hLabelCpuTime, hLabelIO, hLabelThreads, hLabelHandles;
 
     void UpdateDynamicLabels() {
         char buf[128];
 
         // Memória
-        PROCESS_MEMORY_COUNTERS pmc;
-        if (GetProcessMemoryInfo(hProcess, &pmc, sizeof(pmc))) {
-            double memMB = pmc.WorkingSetSize / (1024.0 * 1024.0);
-            snprintf(buf, sizeof(buf), "Memory: %.1f MB", memMB);
+        PROCESS_MEMORY_COUNTERS_EX pmc;
+        if (GetProcessMemoryInfo(hProcess, (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc))) {
+            double memMB = pmc.WorkingSetSize / 1024.0;
+            snprintf(buf, sizeof(buf), "Memory (working set): %.0f K", memMB);
             SetWindowText(hLabelMemory, buf);
+
+            // Calcula Private Working Set real usando QueryWorkingSetEx
+            SIZE_T privateWSBytes = 0;
+            PSAPI_WORKING_SET_EX_INFORMATION* wsInfo = NULL;
+            SIZE_T pageSize;
+            SYSTEM_INFO si;
+            GetSystemInfo(&si);
+            pageSize = si.dwPageSize;
+
+            MEMORY_BASIC_INFORMATION mbi;
+            LPVOID addr = 0;
+            while (VirtualQueryEx(hProcess, addr, &mbi, sizeof(mbi)) == sizeof(mbi)) {
+                if ((mbi.State & MEM_COMMIT) && !(mbi.Type & MEM_IMAGE)) {
+                    SIZE_T regionPages = mbi.RegionSize / pageSize;
+                    wsInfo = (PSAPI_WORKING_SET_EX_INFORMATION*)malloc(sizeof(*wsInfo) * regionPages);
+                    if (!wsInfo) break;
+
+                    for (SIZE_T i = 0; i < regionPages; ++i) {
+                        wsInfo[i].VirtualAddress = (PVOID)((uintptr_t)mbi.BaseAddress + i * pageSize);
+                    }
+
+                    if (QueryWorkingSetEx(hProcess, wsInfo, sizeof(*wsInfo) * regionPages)) {
+                        for (SIZE_T i = 0; i < regionPages; ++i) {
+                            if (wsInfo[i].VirtualAttributes.Valid &&
+                                wsInfo[i].VirtualAttributes.ShareCount == 0) {
+                                privateWSBytes += pageSize;
+                            }
+                        }
+                    }
+
+                    free(wsInfo);
+                }
+
+                addr = (LPBYTE)mbi.BaseAddress + mbi.RegionSize;
+            }
+            double privateWSKB = privateWSBytes / 1024.0;
+            snprintf(buf, sizeof(buf), "Memory (private working set): %.0f K", privateWSKB);
+            SetWindowText(hLabelPrivateMemory, buf);
         }
 
         // CPU Time
@@ -333,7 +371,7 @@ INT_PTR CALLBACK ShowProcessDetailsDialogProc(HWND hDlg, UINT message, WPARAM wP
     }
 
     switch (message) {
-    case WM_INITDIALOG: {
+        case WM_INITDIALOG: {
         hProcess = ((AffinityDialogParams*)lParam)->hProcess;
         pid = ((AffinityDialogParams*)lParam)->pid;
         strncpy(processName, ((AffinityDialogParams*)lParam)->processName, MAX_PATH);
@@ -341,6 +379,8 @@ INT_PTR CALLBACK ShowProcessDetailsDialogProc(HWND hDlg, UINT message, WPARAM wP
         char fullPath[MAX_PATH] = "Unknown";
         char description[256] = "Unknown";
         char company[256] = "Unknown";
+        char timeStr[64] = "Unavailable";
+        char bitnessStr[16] = "Unknown";
 
         // Caminho completo do executável
         HMODULE hMod;
@@ -383,63 +423,123 @@ INT_PTR CALLBACK ShowProcessDetailsDialogProc(HWND hDlg, UINT message, WPARAM wP
             free(verData);
         }
 
-        // Bitness
-        BOOL isWow64 = FALSE;
-        IsWow64Process(hProcess, &isWow64);
-        BOOL is64BitProcess = FALSE;
-    #if defined(_WIN64)
-        is64BitProcess = !isWow64;
-    #else
-        BOOL isWow64OS = FALSE;
-        IsWow64Process(GetCurrentProcess(), &isWow64OS);
-        is64BitProcess = isWow64OS && !isWow64;
-    #endif
-        const char* bitness = is64BitProcess ? "64-bit" : "32-bit";
+        // Tempo de início do processo
+        FILETIME ftCreate, ftExit, ftKernel, ftUser;
+        SYSTEMTIME stUTC, stLocal;
+        if (GetProcessTimes(hProcess, &ftCreate, &ftExit, &ftKernel, &ftUser)) {
+            FileTimeToSystemTime(&ftCreate, &stUTC);
+            SystemTimeToTzSpecificLocalTime(NULL, &stUTC, &stLocal);
+            snprintf(timeStr, sizeof(timeStr), "%02d/%02d/%04d %02d:%02d:%02d",
+                stLocal.wDay, stLocal.wMonth, stLocal.wYear,
+                stLocal.wHour, stLocal.wMinute, stLocal.wSecond);
+        }
 
-        // Tamanho da área cliente
+        // Bitness (32/64-bit)
+        BOOL isTargetWow64 = FALSE;
+        IsWow64Process(hProcess, &isTargetWow64);
+    #if defined(_WIN64)
+        strcpy(bitnessStr, isTargetWow64 ? "32-bit" : "64-bit");
+    #else
+        BOOL isHostWow64 = FALSE;
+        IsWow64Process(GetCurrentProcess(), &isHostWow64);
+        strcpy(bitnessStr, (isHostWow64 && !isTargetWow64) ? "64-bit" : "32-bit");
+    #endif
+
+        // Layout da janela
         RECT rcClient;
         GetClientRect(hDlg, &rcClient);
         int clientWidth = rcClient.right - rcClient.left;
-        int y = 10;
+        int margin = 10;
+        int groupPadding = 10;
+        int y = margin;
 
         HFONT hFont = CreateFontForControl();
-
-        // Campos estáticos
         char buffer[512];
+
+        //
+        // 🔷 Group Box 1 – Informações estáticas
+        //
+        int staticGroupHeight = 22 * 7 + 20; // 6 linhas + margem inferior
+        HWND hGroupStatic = CreateWindow("BUTTON", "Static Information", WS_CHILD | WS_VISIBLE | BS_GROUPBOX,
+            margin, y, clientWidth - 2 * margin, staticGroupHeight, hDlg, NULL, GetModuleHandle(NULL), NULL);
+        SendMessage(hGroupStatic, WM_SETFONT, (WPARAM)hFont, TRUE);
+        y += 20; // espaço para título do group box
+
+        int x = margin + groupPadding;
+        int labelWidth = clientWidth - 2 * (margin + groupPadding);
+
         snprintf(buffer, sizeof(buffer), "Process: %s", processName);
         HWND hStaticName = CreateWindow("STATIC", buffer, WS_CHILD | WS_VISIBLE | SS_LEFT,
-            10, y, clientWidth - 20, 20, hDlg, NULL, GetModuleHandle(NULL), NULL);
+            x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL);
         SendMessage(hStaticName, WM_SETFONT, (WPARAM)hFont, TRUE); y += 22;
+
+        snprintf(buffer, sizeof(buffer), "PID: %lu", pid);
+        HWND hStaticPID = CreateWindow("STATIC", buffer, WS_CHILD | WS_VISIBLE | SS_LEFT,
+            x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL);
+        SendMessage(hStaticPID, WM_SETFONT, (WPARAM)hFont, TRUE); y += 22;
 
         snprintf(buffer, sizeof(buffer), "Description: %s", description);
         HWND hStaticDesc = CreateWindow("STATIC", buffer, WS_CHILD | WS_VISIBLE | SS_LEFT,
-            10, y, clientWidth - 20, 20, hDlg, NULL, GetModuleHandle(NULL), NULL);
+            x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL);
         SendMessage(hStaticDesc, WM_SETFONT, (WPARAM)hFont, TRUE); y += 22;
 
         snprintf(buffer, sizeof(buffer), "Company: %s", company);
         HWND hStaticComp = CreateWindow("STATIC", buffer, WS_CHILD | WS_VISIBLE | SS_LEFT,
-            10, y, clientWidth - 20, 20, hDlg, NULL, GetModuleHandle(NULL), NULL);
-        SendMessage(hStaticComp, WM_SETFONT, (WPARAM)hFont, TRUE); y += 30;
+            x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL);
+        SendMessage(hStaticComp, WM_SETFONT, (WPARAM)hFont, TRUE); y += 22;
 
-        // Campos dinâmicos
+        snprintf(buffer, sizeof(buffer), "Path: %s", fullPath);
+        HWND hStaticPath = CreateWindow("STATIC", buffer,
+            WS_CHILD | WS_VISIBLE | SS_LEFT | SS_ENDELLIPSIS,
+            x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL);
+        SendMessage(hStaticPath, WM_SETFONT, (WPARAM)hFont, TRUE); y += 22;
+
+        snprintf(buffer, sizeof(buffer), "Start Time: %s", timeStr);
+        HWND hStaticStart = CreateWindow("STATIC", buffer, WS_CHILD | WS_VISIBLE | SS_LEFT,
+            x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL);
+        SendMessage(hStaticStart, WM_SETFONT, (WPARAM)hFont, TRUE); y += 22;
+
+        snprintf(buffer, sizeof(buffer), "Bitness: %s", bitnessStr);
+        HWND hStaticBitness = CreateWindow("STATIC", buffer, WS_CHILD | WS_VISIBLE | SS_LEFT,
+            x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL);
+        SendMessage(hStaticBitness, WM_SETFONT, (WPARAM)hFont, TRUE); y += 20;
+
+        //
+        // 🟩 Group Box 2 – Informações dinâmicas
+        //
+        int dynamicGroupTop = y + 30;
+        int dynamicGroupHeight = 22 * 6 + 20;
+
+        HWND hGroupDynamic = CreateWindow("BUTTON", "Live Metrics", WS_CHILD | WS_VISIBLE | BS_GROUPBOX,
+            margin, dynamicGroupTop - 20, clientWidth - 2 * margin, dynamicGroupHeight, hDlg, NULL, GetModuleHandle(NULL), NULL);
+        SendMessage(hGroupDynamic, WM_SETFONT, (WPARAM)hFont, TRUE);
+
+        x = margin + groupPadding;
+        y = dynamicGroupTop;
+
         hLabelMemory = CreateWindow("STATIC", "", WS_CHILD | WS_VISIBLE | SS_LEFT,
-            10, y, clientWidth - 20, 20, hDlg, NULL, GetModuleHandle(NULL), NULL); y += 22;
+            x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL); y += 22;
+        hLabelPrivateMemory = CreateWindow("STATIC", "", WS_CHILD | WS_VISIBLE | SS_LEFT,
+        x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL); y += 22;
         hLabelCpuTime = CreateWindow("STATIC", "", WS_CHILD | WS_VISIBLE | SS_LEFT,
-            10, y, clientWidth - 20, 20, hDlg, NULL, GetModuleHandle(NULL), NULL); y += 22;
+            x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL); y += 22;
         hLabelIO = CreateWindow("STATIC", "", WS_CHILD | WS_VISIBLE | SS_LEFT,
-            10, y, clientWidth - 20, 20, hDlg, NULL, GetModuleHandle(NULL), NULL); y += 22;
+            x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL); y += 22;
         hLabelThreads = CreateWindow("STATIC", "", WS_CHILD | WS_VISIBLE | SS_LEFT,
-            10, y, clientWidth - 20, 20, hDlg, NULL, GetModuleHandle(NULL), NULL); y += 22;
+            x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL); y += 22;
         hLabelHandles = CreateWindow("STATIC", "", WS_CHILD | WS_VISIBLE | SS_LEFT,
-            10, y, clientWidth - 20, 20, hDlg, NULL, GetModuleHandle(NULL), NULL); y += 30;
+            x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL); y += 22;
 
         SendMessage(hLabelMemory, WM_SETFONT, (WPARAM)hFont, TRUE);
+        SendMessage(hLabelPrivateMemory, WM_SETFONT, (WPARAM)hFont, TRUE);
         SendMessage(hLabelCpuTime, WM_SETFONT, (WPARAM)hFont, TRUE);
         SendMessage(hLabelIO, WM_SETFONT, (WPARAM)hFont, TRUE);
         SendMessage(hLabelThreads, WM_SETFONT, (WPARAM)hFont, TRUE);
         SendMessage(hLabelHandles, WM_SETFONT, (WPARAM)hFont, TRUE);
 
-        // Botão "Close" centralizado
+        //
+        // Botão "Close"
+        //
         int buttonWidth = 80, buttonHeight = 25;
         int buttonX = (clientWidth - buttonWidth) / 2;
         int buttonY = rcClient.bottom - buttonHeight - 10;
@@ -447,9 +547,11 @@ INT_PTR CALLBACK ShowProcessDetailsDialogProc(HWND hDlg, UINT message, WPARAM wP
         HWND hClose = CreateWindow("BUTTON", "Close", WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON,
             buttonX, buttonY, buttonWidth, buttonHeight, hDlg, (HMENU)IDOK, GetModuleHandle(NULL), NULL);
         SendMessage(hClose, WM_SETFONT, (WPARAM)hFont, TRUE);
+
         UpdateDynamicLabels();
         SetTimer(hDlg, 1, 1000, NULL);
         return TRUE;
+
     }
 
     case WM_TIMER: {
