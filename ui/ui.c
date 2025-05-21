@@ -71,9 +71,12 @@ void OnTabSelectionChanged(HWND hwndParent, int selectedTab) {
 
     if (selectedTab == 0) {
         ShowWindow(hButtonEndTask, SW_SHOW);
+
+        // Desabilita o botão ao voltar para a aba de processos
+        EnableWindow(hButtonEndTask, FALSE);
     } else {
         ShowWindow(hButtonEndTask, SW_HIDE);
-        UpdateHardwareInfo(); // <- Atualiza info quando mudar para a aba 1 (Hardware)
+        UpdateHardwareInfo();
     }
 }
 
@@ -506,7 +509,7 @@ INT_PTR CALLBACK ShowProcessDetailsDialogProc(HWND hDlg, UINT message, WPARAM wP
         SendMessage(hStaticPID, WM_SETFONT, (WPARAM)hFont, TRUE); y += 22;
 
         snprintf(buffer, sizeof(buffer), "Description: %s", description);
-        HWND hStaticDesc = CreateWindow("STATIC", buffer, WS_CHILD | WS_VISIBLE | SS_LEFT,
+        HWND hStaticDesc = CreateWindow("STATIC", buffer, WS_CHILD | WS_VISIBLE | SS_LEFT | SS_ENDELLIPSIS,
             x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL);
         SendMessage(hStaticDesc, WM_SETFONT, (WPARAM)hFont, TRUE); y += 22;
 
@@ -516,8 +519,7 @@ INT_PTR CALLBACK ShowProcessDetailsDialogProc(HWND hDlg, UINT message, WPARAM wP
         SendMessage(hStaticComp, WM_SETFONT, (WPARAM)hFont, TRUE); y += 22;
 
         snprintf(buffer, sizeof(buffer), "Path: %s", fullPath);
-        HWND hStaticPath = CreateWindow("STATIC", buffer,
-            WS_CHILD | WS_VISIBLE | SS_LEFT | SS_ENDELLIPSIS,
+        HWND hStaticPath = CreateWindow("STATIC", buffer, WS_CHILD | WS_VISIBLE | SS_LEFT | SS_ENDELLIPSIS,
             x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL);
         SendMessage(hStaticPath, WM_SETFONT, (WPARAM)hFont, TRUE); y += 22;
 
