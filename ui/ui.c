@@ -276,16 +276,18 @@ INT_PTR CALLBACK ShowProcessDetailsDialogProc(HWND hDlg, UINT message, WPARAM wP
     static HANDLE hProcess;
     static char processName[MAX_PATH];
     static DWORD pid;
-    static HWND hLabelMemory, hLabelPrivateMemory, hLabelCpuTime, hLabelIO, hLabelThreads, hLabelHandles;
+    static HWND hLabelMemory, hLabelPrivateMemory, hLabelPageFaults, hLabelCpuTime, hLabelIO, hLabelThreads, hLabelHandles;
 
     void UpdateDynamicLabels() {
         char buf[128];
-
-        // Memória
         PROCESS_MEMORY_COUNTERS_EX pmc;
+        
         if (GetProcessMemoryInfo(hProcess, (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc))) {
-            double memMB = pmc.WorkingSetSize / 1024.0;
-            snprintf(buf, sizeof(buf), "Memory (working set): %.0f K", memMB);
+            snprintf(buf, sizeof(buf), "Page Faults: %lu", pmc.PageFaultCount);
+            SetWindowText(hLabelPageFaults, buf);
+
+            double memKB = pmc.WorkingSetSize / 1024.0;
+            snprintf(buf, sizeof(buf), "Memory (working set): %.0f K", memKB);
             SetWindowText(hLabelMemory, buf);
 
             // Calcula Private Working Set real usando QueryWorkingSetEx
@@ -459,7 +461,7 @@ INT_PTR CALLBACK ShowProcessDetailsDialogProc(HWND hDlg, UINT message, WPARAM wP
         //
         // 🔷 Group Box 1 – Informações estáticas
         //
-        int staticGroupHeight = 22 * 7 + 20; // 6 linhas + margem inferior
+        int staticGroupHeight = 22 * 7 + 20; // 7 linhas + margem inferior
         HWND hGroupStatic = CreateWindow("BUTTON", "Static Information", WS_CHILD | WS_VISIBLE | BS_GROUPBOX,
             margin, y, clientWidth - 2 * margin, staticGroupHeight, hDlg, NULL, GetModuleHandle(NULL), NULL);
         SendMessage(hGroupStatic, WM_SETFONT, (WPARAM)hFont, TRUE);
@@ -508,7 +510,7 @@ INT_PTR CALLBACK ShowProcessDetailsDialogProc(HWND hDlg, UINT message, WPARAM wP
         // 🟩 Group Box 2 – Informações dinâmicas
         //
         int dynamicGroupTop = y + 30;
-        int dynamicGroupHeight = 22 * 6 + 20;
+        int dynamicGroupHeight = 22 * 7 + 20;
 
         HWND hGroupDynamic = CreateWindow("BUTTON", "Live Metrics", WS_CHILD | WS_VISIBLE | BS_GROUPBOX,
             margin, dynamicGroupTop - 20, clientWidth - 2 * margin, dynamicGroupHeight, hDlg, NULL, GetModuleHandle(NULL), NULL);
@@ -521,6 +523,8 @@ INT_PTR CALLBACK ShowProcessDetailsDialogProc(HWND hDlg, UINT message, WPARAM wP
             x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL); y += 22;
         hLabelPrivateMemory = CreateWindow("STATIC", "", WS_CHILD | WS_VISIBLE | SS_LEFT,
         x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL); y += 22;
+        hLabelPageFaults = CreateWindow("STATIC", "", WS_CHILD | WS_VISIBLE | SS_LEFT,
+        x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL); y += 22; 
         hLabelCpuTime = CreateWindow("STATIC", "", WS_CHILD | WS_VISIBLE | SS_LEFT,
             x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL); y += 22;
         hLabelIO = CreateWindow("STATIC", "", WS_CHILD | WS_VISIBLE | SS_LEFT,
@@ -532,6 +536,7 @@ INT_PTR CALLBACK ShowProcessDetailsDialogProc(HWND hDlg, UINT message, WPARAM wP
 
         SendMessage(hLabelMemory, WM_SETFONT, (WPARAM)hFont, TRUE);
         SendMessage(hLabelPrivateMemory, WM_SETFONT, (WPARAM)hFont, TRUE);
+        SendMessage(hLabelPageFaults, WM_SETFONT, (WPARAM)hFont, TRUE);
         SendMessage(hLabelCpuTime, WM_SETFONT, (WPARAM)hFont, TRUE);
         SendMessage(hLabelIO, WM_SETFONT, (WPARAM)hFont, TRUE);
         SendMessage(hLabelThreads, WM_SETFONT, (WPARAM)hFont, TRUE);
