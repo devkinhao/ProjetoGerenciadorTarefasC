@@ -314,28 +314,38 @@ void UpdateUptimeInfo(HWND hLabelUptime) {
 }
 
 int UpdateGPUInfo(HWND hLabelGpu) {
+    HDEVINFO hDevInfo;
+    SP_DEVINFO_DATA devInfoData;
     char buffer[1024] = "";
     char temp[256];
-    DISPLAY_DEVICEA dd;
     int gpuCount = 0;
 
-    ZeroMemory(&dd, sizeof(dd));
-    dd.cb = sizeof(dd);
+    hDevInfo = SetupDiGetClassDevs(&GUID_DEVCLASS_DISPLAY, NULL, NULL, DIGCF_PRESENT);
+    if (hDevInfo == INVALID_HANDLE_VALUE) {
+        SetWindowTextA(hLabelGpu, "GPU: Not detected");
+        return 0;
+    }
 
-    for (int i = 0; EnumDisplayDevicesA(NULL, i, &dd, 0); i++) {
-        if (dd.StateFlags & DISPLAY_DEVICE_ACTIVE || dd.StateFlags & DISPLAY_DEVICE_PRIMARY_DEVICE) {
-            // Remover espaços do final do nome
-            for (int j = strlen(dd.DeviceString) - 1; j >= 0 && isspace(dd.DeviceString[j]); j--) {
-                dd.DeviceString[j] = '\0';
-            }
+    devInfoData.cbSize = sizeof(SP_DEVINFO_DATA);
 
-            snprintf(temp, sizeof(temp), "GPU %d: %s\n", gpuCount + 1, dd.DeviceString);
+    for (int i = 0; SetupDiEnumDeviceInfo(hDevInfo, i, &devInfoData); i++) {
+        char deviceName[256];
+        if (SetupDiGetDeviceRegistryPropertyA(
+                hDevInfo,
+                &devInfoData,
+                SPDRP_DEVICEDESC,
+                NULL,
+                (PBYTE)deviceName,
+                sizeof(deviceName),
+                NULL)) {
+
+            snprintf(temp, sizeof(temp), "GPU %d: %s\n", gpuCount + 1, deviceName);
             strncat(buffer, temp, sizeof(buffer) - strlen(buffer) - 1);
             gpuCount++;
         }
-        ZeroMemory(&dd, sizeof(dd));
-        dd.cb = sizeof(dd);
     }
+
+    SetupDiDestroyDeviceInfoList(hDevInfo);
 
     if (gpuCount == 0) {
         snprintf(buffer, sizeof(buffer), "GPU: Not detected");

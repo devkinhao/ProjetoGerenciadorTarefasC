@@ -39,7 +39,11 @@
 #include <ws2tcpip.h>
 #include <powrprof.h>
 #include <dxgi.h>
+#include <setupapi.h>
+#include <devguid.h>     // GUID_DEVCLASS_DISPLAY
+#include <regstr.h>   
 
+#pragma comment(lib, "setupapi.lib")
 #pragma comment(lib, "Shlwapi.lib")
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "iphlpapi.lib")
