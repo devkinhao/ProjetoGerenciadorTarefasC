@@ -11,10 +11,10 @@ HWND CreateGroupBox(HWND parent, const char* title, int x, int y, int width, int
 double CalculateCpuUsage();
 void UpdateCpuInfo();
 void UpdateRamInfo();
-void UpdateDiskInfo(HWND hDiskLabel);
+int UpdateDiskInfo(HWND hDiskLabel);
 void UpdateOSInfo(HWND hLabelOs) ;
 void UpdateUptimeInfo(HWND hLabelUptime);
-void UpdateGPUInfo(HWND hLabelGpu);
+int UpdateGPUInfo(HWND hLabelGpu);
 void UpdateBatteryInfo(HWND hLabelBattery);
 void UpdateSystemInfo(HWND hLabelSystem);
 void AddHardwarePanel(HWND hwndParent);

@@ -16,6 +16,9 @@ typedef struct {
     HWND hCores;
     HWND hUsage;
     HWND hSpeed;
+    HWND hProcesses;
+    HWND hThreads;
+    HWND hHandles;
     HWND hCacheL1;
     HWND hCacheL2;
     HWND hCacheL3;
@@ -122,8 +125,56 @@ void UpdateCpuInfo() {
     SetWindowText(cpuControls.hCores, buffer);
     snprintf(buffer, sizeof(buffer), "Usage: %d%%", (int)cpuUsage);
     SetWindowText(cpuControls.hUsage, buffer);
-    snprintf(buffer, sizeof(buffer), "Speed: %.2f GHz", clockSpeed);
+    snprintf(buffer, sizeof(buffer), "Base speed: %.2f GHz", clockSpeed);
     SetWindowText(cpuControls.hSpeed, buffer);
+
+     // Obter informações de processos, threads e handles do sistema
+    DWORD processCount = 0;
+    DWORD threadCount = 0;
+    DWORD handleCount = 0;
+
+    DWORD processes[1024], cbNeeded, cProcesses;
+    if (EnumProcesses(processes, sizeof(processes), &cbNeeded)) {
+        cProcesses = cbNeeded / sizeof(DWORD);
+        processCount = cProcesses;
+
+        // Somar handles
+        for (DWORD i = 0; i < cProcesses; i++) {
+            if (processes[i] != 0) {
+                HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processes[i]);
+                if (hProcess) {
+                    DWORD hCount = 0;
+                    if (GetProcessHandleCount(hProcess, &hCount)) {
+                        handleCount += hCount;
+                    }
+                    CloseHandle(hProcess);
+                }
+            }
+        }
+
+        // Contar threads: snapshot único
+        HANDLE hThreadSnap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+        if (hThreadSnap != INVALID_HANDLE_VALUE) {
+            THREADENTRY32 te32;
+            te32.dwSize = sizeof(THREADENTRY32);
+
+            if (Thread32First(hThreadSnap, &te32)) {
+                do {
+                    threadCount++;
+                } while (Thread32Next(hThreadSnap, &te32));
+            }
+            CloseHandle(hThreadSnap);
+        }
+    }
+
+    snprintf(buffer, sizeof(buffer), "Processes: %lu", processCount);
+    SetWindowText(cpuControls.hProcesses, buffer);
+
+    snprintf(buffer, sizeof(buffer), "Threads: %lu", threadCount);
+    SetWindowText(cpuControls.hThreads, buffer);
+
+    snprintf(buffer, sizeof(buffer), "Handles: %lu", handleCount);
+    SetWindowText(cpuControls.hHandles, buffer);
 
     // Cache info (L1, L2, L3)
     DWORD len = 0;
@@ -184,10 +235,11 @@ void UpdateRamInfo() {
     SetWindowText(hLabelRam, buffer);
 }
 
-void UpdateDiskInfo(HWND hDiskLabel) {
+int UpdateDiskInfo(HWND hDiskLabel) {
     DWORD drives = GetLogicalDrives();
     char buffer[2048] = "";
     char temp[512];
+    int partitionCount = 0;
 
     for (char letter = 'A'; letter <= 'Z'; ++letter) {
         if (drives & (1 << (letter - 'A'))) {
@@ -213,11 +265,13 @@ void UpdateDiskInfo(HWND hDiskLabel) {
                 }
 
                 strncat(buffer, temp, sizeof(buffer) - strlen(buffer) - 1);
+                partitionCount++;
             }
         }
     }
 
     SetWindowText(hDiskLabel, strlen(buffer) ? buffer : "No drives detected.");
+    return partitionCount;
 }
 
 void UpdateOSInfo(HWND hLabelOs) {
@@ -259,22 +313,36 @@ void UpdateUptimeInfo(HWND hLabelUptime) {
     SetWindowTextA(hLabelUptime, buffer);
 }
 
-void UpdateGPUInfo(HWND hLabelGpu) {
-    char buffer[256];
+int UpdateGPUInfo(HWND hLabelGpu) {
+    char buffer[1024] = "";
+    char temp[256];
     DISPLAY_DEVICEA dd;
+    int gpuCount = 0;
+
     ZeroMemory(&dd, sizeof(dd));
     dd.cb = sizeof(dd);
 
-    if (EnumDisplayDevicesA(NULL, 0, &dd, 0)) {
-        for (int i = strlen(dd.DeviceString) - 1; i >= 0 && isspace(dd.DeviceString[i]); i--) {
-            dd.DeviceString[i] = '\0';
+    for (int i = 0; EnumDisplayDevicesA(NULL, i, &dd, 0); i++) {
+        if (dd.StateFlags & DISPLAY_DEVICE_ACTIVE || dd.StateFlags & DISPLAY_DEVICE_PRIMARY_DEVICE) {
+            // Remover espaços do final do nome
+            for (int j = strlen(dd.DeviceString) - 1; j >= 0 && isspace(dd.DeviceString[j]); j--) {
+                dd.DeviceString[j] = '\0';
+            }
+
+            snprintf(temp, sizeof(temp), "GPU %d: %s\n", gpuCount + 1, dd.DeviceString);
+            strncat(buffer, temp, sizeof(buffer) - strlen(buffer) - 1);
+            gpuCount++;
         }
-        snprintf(buffer, sizeof(buffer), "GPU: %s", dd.DeviceString);
-    } else {
+        ZeroMemory(&dd, sizeof(dd));
+        dd.cb = sizeof(dd);
+    }
+
+    if (gpuCount == 0) {
         snprintf(buffer, sizeof(buffer), "GPU: Not detected");
     }
 
     SetWindowTextA(hLabelGpu, buffer);
+    return gpuCount;
 }
 
 void UpdateBatteryInfo(HWND hLabelBattery) {
@@ -336,25 +404,43 @@ void AddHardwarePanel(HWND hwndParent) {
     int yPos = 10;
 
     // --- CPU Section ---
-    cpuControls.hGroup = CreateGroupBox(hHardwarePanel, "CPU", 22.5, yPos, LEFT_COLUMN_WIDTH, 210);
+    cpuControls.hGroup = CreateGroupBox(hHardwarePanel, "CPU", 22.5, yPos, LEFT_COLUMN_WIDTH, 285);
     cpuControls.hName = CreateLabel(hHardwarePanel, "Model: Loading...", 32.5, yPos + 25, LEFT_COLUMN_WIDTH - 20, 20, SS_LEFT);
     cpuControls.hCores = CreateLabel(hHardwarePanel, "Cores: Loading...", 32.5, yPos + 50, LEFT_COLUMN_WIDTH - 20, 20, SS_LEFT);
     cpuControls.hUsage = CreateLabel(hHardwarePanel, "Usage: 0%", 32.5, yPos + 75, LEFT_COLUMN_WIDTH - 20, 20, SS_LEFT);
     cpuControls.hSpeed = CreateLabel(hHardwarePanel, "Speed: 0.00 GHz", 32.5, yPos + 100, LEFT_COLUMN_WIDTH - 20, 20, SS_LEFT);
-    cpuControls.hCacheL1 = CreateLabel(hHardwarePanel, "L1 Cache: Loading...", 32.5, yPos + 125, LEFT_COLUMN_WIDTH - 20, 20, SS_LEFT);
-    cpuControls.hCacheL2 = CreateLabel(hHardwarePanel, "L2 Cache: Loading...", 32.5, yPos + 150, LEFT_COLUMN_WIDTH - 20, 20, SS_LEFT);
-    cpuControls.hCacheL3 = CreateLabel(hHardwarePanel, "L3 Cache: Loading...", 32.5, yPos + 175, LEFT_COLUMN_WIDTH - 20, 20, SS_LEFT);
+    cpuControls.hProcesses = CreateLabel(hHardwarePanel, "Processes: Loading...", 32.5, yPos + 125, LEFT_COLUMN_WIDTH - 20, 20, SS_LEFT);
+    cpuControls.hThreads = CreateLabel(hHardwarePanel, "Threads: Loading...", 32.5, yPos + 150, LEFT_COLUMN_WIDTH - 20, 20, SS_LEFT);
+    cpuControls.hHandles = CreateLabel(hHardwarePanel, "Handles: Loading...", 32.5, yPos + 175, LEFT_COLUMN_WIDTH - 20, 20, SS_LEFT);
+    cpuControls.hCacheL1 = CreateLabel(hHardwarePanel, "L1 Cache: Loading...", 32.5, yPos + 200, LEFT_COLUMN_WIDTH - 20, 20, SS_LEFT);
+    cpuControls.hCacheL2 = CreateLabel(hHardwarePanel, "L2 Cache: Loading...", 32.5, yPos + 225, LEFT_COLUMN_WIDTH - 20, 20, SS_LEFT);
+    cpuControls.hCacheL3 = CreateLabel(hHardwarePanel, "L3 Cache: Loading...", 32.5, yPos + 250, LEFT_COLUMN_WIDTH - 20, 20, SS_LEFT);
     
-    yPos += 210 + SECTION_SPACING;
+    yPos += 285 + SECTION_SPACING;
 
-    // --- Seções RAM, Disco, SO, GPU, Bateria, Sistema ---
+    // --- Seção RAM ---
     hRamGroup = CreateGroupBox(hHardwarePanel, "Memory", 22.5, yPos, LEFT_COLUMN_WIDTH, 75);
     hLabelRam = CreateLabel(hHardwarePanel, "Total: Loading...\nFree: Loading...", 32.5, yPos + GROUPBOX_TOP_MARGIN, LEFT_COLUMN_WIDTH - 20, 45, SS_LEFT);
     yPos += 75 + SECTION_SPACING;
 
-    hDiskGroup = CreateGroupBox(hHardwarePanel, "Storage", 22.5, yPos, LEFT_COLUMN_WIDTH, 75);
-    hLabelDisk = CreateLabel(hHardwarePanel, "Total: Loading...\nFree: Loading...", 32.5, yPos + GROUPBOX_TOP_MARGIN, LEFT_COLUMN_WIDTH - 20, 45, SS_LEFT);
-    yPos += 75 + SECTION_SPACING;
+    // --- Seção DISCO (ajustável dinamicamente) ---
+    hDiskGroup = CreateGroupBox(hHardwarePanel, "Storage", 22.5, yPos, LEFT_COLUMN_WIDTH, 75);  // altura será ajustada depois
+    hLabelDisk = CreateLabel(hHardwarePanel, "", 32.5, yPos + GROUPBOX_TOP_MARGIN, LEFT_COLUMN_WIDTH - 20, 45, SS_LEFT);
+
+    // Atualiza conteúdo e obtém quantidade de partições
+    int diskCount = UpdateDiskInfo(hLabelDisk);
+
+    // Define altura com base no número de partições
+    int diskLineHeight = 20;
+    int diskGroupBoxHeight = diskCount * diskLineHeight + 20;
+    if (diskGroupBoxHeight < 75) diskGroupBoxHeight = 75;
+
+    // Ajusta tamanho do GroupBox e do Label
+    SetWindowPos(hDiskGroup, NULL, 0, 0, LEFT_COLUMN_WIDTH, diskGroupBoxHeight, SWP_NOMOVE | SWP_NOZORDER);
+    SetWindowPos(hLabelDisk, NULL, 0, 0, LEFT_COLUMN_WIDTH - 20, diskGroupBoxHeight - 30, SWP_NOMOVE | SWP_NOZORDER);
+
+    // Atualiza yPos
+    yPos += diskGroupBoxHeight + SECTION_SPACING;
 
     // --- Coluna da direita ---
     int yPosRight = 10;  // Começar a coluna direita no mesmo nível da coluna esquerda
@@ -362,9 +448,24 @@ void AddHardwarePanel(HWND hwndParent) {
     hLabelOs = CreateLabel(hHardwarePanel, "OS: Loading...\nVersion: Loading...", LEFT_COLUMN_WIDTH + 42.5, yPosRight + GROUPBOX_TOP_MARGIN, RIGHT_COLUMN_WIDTH - 20, 45, SS_LEFT);
     yPosRight += 75 + SECTION_SPACING;
 
-    hGpuGroup = CreateGroupBox(hHardwarePanel, "Graphics", LEFT_COLUMN_WIDTH + 20 + 12.5, yPosRight, RIGHT_COLUMN_WIDTH, 60);
-    hLabelGpu = CreateLabel(hHardwarePanel, "GPU: Loading...", LEFT_COLUMN_WIDTH + 42.5, yPosRight + GROUPBOX_TOP_MARGIN, RIGHT_COLUMN_WIDTH - 20, 20, SS_LEFT);
-    yPosRight += 60 + SECTION_SPACING;
+    // --- Seção GPU (ajustável dinamicamente) ---
+    hGpuGroup = CreateGroupBox(hHardwarePanel, "Graphics", LEFT_COLUMN_WIDTH + 20 + 12.5, yPosRight, RIGHT_COLUMN_WIDTH, 75);
+    hLabelGpu = CreateLabel(hHardwarePanel, "", LEFT_COLUMN_WIDTH + 42.5, yPosRight + GROUPBOX_TOP_MARGIN, RIGHT_COLUMN_WIDTH - 20, 45, SS_LEFT);
+
+    // Atualiza conteúdo e obtém quantidade de GPUs
+    int gpuCount = UpdateGPUInfo(hLabelGpu);
+
+    // Define altura com base no número de GPUs
+    int gpuLineHeight  = 20;
+    int gpuGroupBoxHeight  = gpuCount * gpuLineHeight  + 20;
+    if (gpuGroupBoxHeight  < 75) gpuGroupBoxHeight  = 75;
+
+    // Ajusta tamanho do GroupBox e do Label
+    SetWindowPos(hGpuGroup, NULL, 0, 0, RIGHT_COLUMN_WIDTH, gpuGroupBoxHeight , SWP_NOMOVE | SWP_NOZORDER);
+    SetWindowPos(hLabelGpu, NULL, 0, 0, RIGHT_COLUMN_WIDTH - 20, gpuGroupBoxHeight  - 30, SWP_NOMOVE | SWP_NOZORDER);
+
+    // Atualiza yPosRight
+    yPosRight += gpuGroupBoxHeight  + SECTION_SPACING;
 
     hBatteryGroup = CreateGroupBox(hHardwarePanel, "Power", LEFT_COLUMN_WIDTH + 20 + 12.5, yPosRight, RIGHT_COLUMN_WIDTH, 60);
     hLabelBattery = CreateLabel(hHardwarePanel, "Battery: Loading...", LEFT_COLUMN_WIDTH + 42.5, yPosRight + GROUPBOX_TOP_MARGIN, RIGHT_COLUMN_WIDTH - 20, 20, SS_LEFT);
