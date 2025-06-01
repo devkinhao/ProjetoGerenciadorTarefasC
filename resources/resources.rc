@@ -3,7 +3,7 @@
 101 DIALOGEX 0, 0, 230, 190
 STYLE DS_SETFONT | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "Processor Affinity"
-FONT 8, "MS Shell Dlg"
+FONT 8, "Segoe UI"
 BEGIN
     // Nenhum controle aqui, tudo será criado no WM_INITDIALOG
 END
@@ -11,7 +11,7 @@ END
 102 DIALOGEX 0, 0, 230, 270
 STYLE DS_SETFONT | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "Process Details"
-FONT 8, "MS Shell Dlg"
+FONT 8, "Segoe UI"
 BEGIN
     // Controles serão criados em tempo de execução
 END
