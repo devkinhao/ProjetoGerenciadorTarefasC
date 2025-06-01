@@ -34,12 +34,15 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
         break;
     }
 
-    case WM_TIMER:
-        UpdateProcessList();
-        if (TabCtrl_GetCurSel(hTab) == 1) { // Se estiver na aba de Hardware
+    case WM_TIMER: {
+        int selectedTab = TabCtrl_GetCurSel(hTab);
+        if (selectedTab == 0) {
+            UpdateProcessList();
+        } else if (selectedTab == 1) {
             UpdateHardwareInfo();
         }
         break;
+    }
 
     case WM_CONTEXTMENU:
         if ((HWND)wParam == hListView) {
@@ -96,7 +99,7 @@ int main() {
     RegisterClass(&wc);
 
     HWND hwnd = CreateWindow(wc.lpszClassName, "Task Manager", 
-        WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX, // Remover WS_MAXIMIZEBOX aqui
+        WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_CLIPCHILDREN | WS_CLIPSIBLINGS,
         CW_USEDEFAULT, CW_USEDEFAULT, 
         WINDOW_WIDTH, WINDOW_HEIGHT, 
         NULL, NULL, wc.hInstance, NULL);
@@ -125,6 +128,7 @@ int main() {
 
     ShowWindow(hwnd, SW_SHOW);
     UpdateWindow(hwnd);
+    UpdateProcessList();
 
     MSG msg;
     while (GetMessage(&msg, NULL, 0, 0))

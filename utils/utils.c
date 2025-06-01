@@ -34,3 +34,11 @@ void CenterWindowToScreen(HWND hwnd, int windowWidth, int windowHeight) {
 
     SetWindowPos(hwnd, HWND_TOP, posX, posY, 0, 0, SWP_NOSIZE);
 }
+
+void SafeSetWindowText(HWND hWnd, const char* newText) {
+    char currentText[512];
+    GetWindowText(hWnd, currentText, sizeof(currentText));
+    if (strcmp(currentText, newText) != 0) {
+        SetWindowText(hWnd, newText);
+    }
+}

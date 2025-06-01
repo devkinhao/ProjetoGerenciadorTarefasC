@@ -120,13 +120,13 @@ void UpdateCpuInfo() {
     double cpuUsage = CalculateCpuUsage();
     double clockSpeed = (double)cpuMHz / 1000.0;
 
-    SetWindowText(cpuControls.hName, cpuName);
+    SafeSetWindowText(cpuControls.hName, cpuName);
     snprintf(buffer, sizeof(buffer), "Logical Processors: %d", sysInfo.dwNumberOfProcessors);
-    SetWindowText(cpuControls.hCores, buffer);
+    SafeSetWindowText(cpuControls.hCores, buffer);
     snprintf(buffer, sizeof(buffer), "Usage: %d%%", (int)cpuUsage);
-    SetWindowText(cpuControls.hUsage, buffer);
+    SafeSetWindowText(cpuControls.hUsage, buffer);
     snprintf(buffer, sizeof(buffer), "Base speed: %.2f GHz", clockSpeed);
-    SetWindowText(cpuControls.hSpeed, buffer);
+    SafeSetWindowText(cpuControls.hSpeed, buffer);
 
      // Obter informações de processos, threads e handles do sistema
     DWORD processCount = 0;
@@ -168,13 +168,13 @@ void UpdateCpuInfo() {
     }
 
     snprintf(buffer, sizeof(buffer), "Processes: %lu", processCount);
-    SetWindowText(cpuControls.hProcesses, buffer);
+    SafeSetWindowText(cpuControls.hProcesses, buffer);
 
     snprintf(buffer, sizeof(buffer), "Threads: %lu", threadCount);
-    SetWindowText(cpuControls.hThreads, buffer);
+    SafeSetWindowText(cpuControls.hThreads, buffer);
 
     snprintf(buffer, sizeof(buffer), "Handles: %lu", handleCount);
-    SetWindowText(cpuControls.hHandles, buffer);
+    SafeSetWindowText(cpuControls.hHandles, buffer);
 
     // Cache info (L1, L2, L3)
     DWORD len = 0;
@@ -206,21 +206,21 @@ void UpdateCpuInfo() {
         snprintf(buffer, sizeof(buffer), "L1 Cache: %.1f MB", l1TotalKB / 1024.0f);
     else
         snprintf(buffer, sizeof(buffer), "L1 Cache: %u KB", l1TotalKB);
-    SetWindowText(cpuControls.hCacheL1, buffer);
+    SafeSetWindowText(cpuControls.hCacheL1, buffer);
 
     // Exibir L2
     if (l2TotalKB >= 1024)
         snprintf(buffer, sizeof(buffer), "L2 Cache: %.1f MB", l2TotalKB / 1024.0f);
     else
         snprintf(buffer, sizeof(buffer), "L2 Cache: %u KB", l2TotalKB);
-    SetWindowText(cpuControls.hCacheL2, buffer);
+    SafeSetWindowText(cpuControls.hCacheL2, buffer);
 
     // Exibir L3
     if (l3TotalKB >= 1024)
         snprintf(buffer, sizeof(buffer), "L3 Cache: %.1f MB", l3TotalKB / 1024.0f);
     else
         snprintf(buffer, sizeof(buffer), "L3 Cache: %u KB", l3TotalKB);
-    SetWindowText(cpuControls.hCacheL3, buffer);
+    SafeSetWindowText(cpuControls.hCacheL3, buffer);
 }
 
 void UpdateRamInfo() {
@@ -232,7 +232,7 @@ void UpdateRamInfo() {
     DWORD usagePercent = memInfo.dwMemoryLoad;
     char buffer[256];
     snprintf(buffer, sizeof(buffer), "Total: %llu MB\nFree: %llu MB (used %lu%%)", totalRamMB, availRamMB, usagePercent);
-    SetWindowText(hLabelRam, buffer);
+    SafeSetWindowText(hLabelRam, buffer);
 }
 
 int UpdateDiskInfo(HWND hDiskLabel) {
@@ -270,7 +270,7 @@ int UpdateDiskInfo(HWND hDiskLabel) {
         }
     }
 
-    SetWindowText(hDiskLabel, strlen(buffer) ? buffer : "No drives detected.");
+    SafeSetWindowText(hDiskLabel, strlen(buffer) ? buffer : "No drives detected.");
     return partitionCount;
 }
 
@@ -297,7 +297,7 @@ void UpdateOSInfo(HWND hLabelOs) {
     }
 
     snprintf(buffer, sizeof(buffer), "OS: %s\nVersion: %s (Build %s)", osName, osDisplayVersion, osBuild);
-    SetWindowTextA(hLabelOs, buffer);
+    SafeSetWindowText(hLabelOs, buffer);
 }
 
 void UpdateUptimeInfo(HWND hLabelUptime) {
@@ -310,7 +310,7 @@ void UpdateUptimeInfo(HWND hLabelUptime) {
     DWORD seconds = (DWORD)(uptimeSecs % 60);
 
     snprintf(buffer, sizeof(buffer), "Uptime: %u:%02u:%02u:%02u", days, hours, minutes, seconds);
-    SetWindowTextA(hLabelUptime, buffer);
+    SafeSetWindowText(hLabelUptime, buffer);
 }
 
 int UpdateGPUInfo(HWND hLabelGpu) {
@@ -322,7 +322,7 @@ int UpdateGPUInfo(HWND hLabelGpu) {
 
     hDevInfo = SetupDiGetClassDevs(&GUID_DEVCLASS_DISPLAY, NULL, NULL, DIGCF_PRESENT);
     if (hDevInfo == INVALID_HANDLE_VALUE) {
-        SetWindowTextA(hLabelGpu, "GPU: Not detected");
+        SafeSetWindowText(hLabelGpu, "GPU: Not detected");
         return 0;
     }
 
@@ -380,7 +380,7 @@ int UpdateGPUInfo(HWND hLabelGpu) {
         snprintf(buffer, sizeof(buffer), "GPU: Not detected");
     }
 
-    SetWindowTextA(hLabelGpu, buffer);
+    SafeSetWindowText(hLabelGpu, buffer);
     return gpuCount;
 }
 
@@ -402,7 +402,7 @@ void UpdateBatteryInfo(HWND hLabelBattery) {
         snprintf(buffer, sizeof(buffer), "Battery: Unknown");
     }
 
-    SetWindowTextA(hLabelBattery, buffer);
+    SafeSetWindowText(hLabelBattery, buffer);
 }
 
 void UpdateSystemInfo(HWND hLabelSystem) {
@@ -430,7 +430,7 @@ void UpdateSystemInfo(HWND hLabelSystem) {
 
     snprintf(buffer, sizeof(buffer), "Computer: %s (%s %s)\nUser: %s", 
              computerName, manufacturer, model, userName);
-    SetWindowTextA(hLabelSystem, buffer);
+    SafeSetWindowText(hLabelSystem, buffer);
 }
 
 void AddHardwarePanel(HWND hwndParent) {
@@ -518,7 +518,6 @@ void AddHardwarePanel(HWND hwndParent) {
 }
 
 void UpdateHardwareInfo() {
-   
     UpdateCpuInfo();
     UpdateRamInfo();
     UpdateDiskInfo(hLabelDisk);
@@ -527,5 +526,4 @@ void UpdateHardwareInfo() {
     UpdateGPUInfo(hLabelGpu);
     UpdateBatteryInfo(hLabelBattery);
     UpdateSystemInfo(hLabelSystem);
-
 }
