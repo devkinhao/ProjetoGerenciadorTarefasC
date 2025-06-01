@@ -123,9 +123,20 @@ void UpdateProcessInfo(int processIndex, HANDLE hProcess) {
     GetProcessUser(hProcess, user, sizeof(user));
     _itoa(processes[processIndex].pid, pidText, 10);
 
-    ListView_SetItemText(hListView, processIndex, 1, user);
-    ListView_SetItemText(hListView, processIndex, 2, pidText);
-    ListView_SetItemText(hListView, processIndex, 3, "Running");
+    // Atualizar somente se diferente
+    char currentText[64];
+
+    ListView_GetItemText(hListView, processIndex, 1, currentText, sizeof(currentText));
+    if (strcmp(currentText, user) != 0)
+        ListView_SetItemText(hListView, processIndex, 1, user);
+
+    ListView_GetItemText(hListView, processIndex, 2, currentText, sizeof(currentText));
+    if (strcmp(currentText, pidText) != 0)
+        ListView_SetItemText(hListView, processIndex, 2, pidText);
+
+    ListView_GetItemText(hListView, processIndex, 3, currentText, sizeof(currentText));
+    if (strcmp(currentText, "Running") != 0)
+        ListView_SetItemText(hListView, processIndex, 3, "Running");
 }
 
 void UpdateProcessMetrics(int processIndex, HANDLE hProcess) {
@@ -137,13 +148,23 @@ void UpdateProcessMetrics(int processIndex, HANDLE hProcess) {
     GetMemoryUsage(hProcess, memBuffer, sizeof(memBuffer));
     GetDiskUsage(hProcess, diskBuffer, &processes[processIndex]);
 
-    ListView_SetItemText(hListView, processIndex, 4, cpuBuffer);
-    ListView_SetItemText(hListView, processIndex, 5, memBuffer);
-    ListView_SetItemText(hListView, processIndex, 6, diskBuffer);
+    // CPU
+    if (strcmp(processes[processIndex].cpu, cpuBuffer) != 0) {
+        ListView_SetItemText(hListView, processIndex, 4, cpuBuffer);
+        strncpy(processes[processIndex].cpu, cpuBuffer, sizeof(processes[processIndex].cpu));
+    }
 
-    strncpy(processes[processIndex].cpu, cpuBuffer, sizeof(processes[processIndex].cpu));
-    strncpy(processes[processIndex].memory, memBuffer, sizeof(processes[processIndex].memory));
-    strncpy(processes[processIndex].disk, diskBuffer, sizeof(processes[processIndex].disk));
+    // Memória
+    if (strcmp(processes[processIndex].memory, memBuffer) != 0) {
+        ListView_SetItemText(hListView, processIndex, 5, memBuffer);
+        strncpy(processes[processIndex].memory, memBuffer, sizeof(processes[processIndex].memory));
+    }
+
+    // Disco
+    if (strcmp(processes[processIndex].disk, diskBuffer) != 0) {
+        ListView_SetItemText(hListView, processIndex, 6, diskBuffer);
+        strncpy(processes[processIndex].disk, diskBuffer, sizeof(processes[processIndex].disk));
+    }
 }
 
 void RemoveNonExistingProcesses(bool processExists[]) {

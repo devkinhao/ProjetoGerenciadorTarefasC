@@ -298,7 +298,7 @@ INT_PTR CALLBACK ShowProcessDetailsDialogProc(HWND hDlg, UINT message, WPARAM wP
         
         if (GetProcessMemoryInfo(hProcess, (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc))) {
             snprintf(buf, sizeof(buf), "Page Faults: %lu", pmc.PageFaultCount);
-            SetWindowText(hLabelPageFaults, buf);
+            SafeSetWindowText(hLabelPageFaults, buf);
 
             DWORD prio = GetPriorityClass(hProcess);
             const char* prioStr;
@@ -312,11 +312,11 @@ INT_PTR CALLBACK ShowProcessDetailsDialogProc(HWND hDlg, UINT message, WPARAM wP
                 default: prioStr = "Unknown"; break;
             }
             snprintf(buf, sizeof(buf), "Priority: %s", prioStr);
-            SetWindowText(hLabelPriority, buf);
+            SafeSetWindowText(hLabelPriority, buf);
 
             double memKB = pmc.WorkingSetSize / 1024.0;
             snprintf(buf, sizeof(buf), "Memory (working set): %.0f K", memKB);
-            SetWindowText(hLabelMemory, buf);
+            SafeSetWindowText(hLabelMemory, buf);
 
             // Calcula Private Working Set real usando QueryWorkingSetEx
             SIZE_T privateWSBytes = 0;
@@ -354,7 +354,7 @@ INT_PTR CALLBACK ShowProcessDetailsDialogProc(HWND hDlg, UINT message, WPARAM wP
             }
             double privateWSKB = privateWSBytes / 1024.0;
             snprintf(buf, sizeof(buf), "Memory (private working set): %.0f K", privateWSKB);
-            SetWindowText(hLabelPrivateMemory, buf);
+            SafeSetWindowText(hLabelPrivateMemory, buf);
         }
 
         // CPU Time
@@ -365,7 +365,7 @@ INT_PTR CALLBACK ShowProcessDetailsDialogProc(HWND hDlg, UINT message, WPARAM wP
             DWORD sec = (DWORD)(total / 10000000);
             DWORD min = sec / 60; sec %= 60;
             snprintf(buf, sizeof(buf), "CPU Time: %02lu:%02lu", min, sec);
-            SetWindowText(hLabelCpuTime, buf);
+            SafeSetWindowText(hLabelCpuTime, buf);
         }
 
         // I/O
@@ -374,7 +374,7 @@ INT_PTR CALLBACK ShowProcessDetailsDialogProc(HWND hDlg, UINT message, WPARAM wP
             double r = io.ReadTransferCount / (1024.0 * 1024.0);
             double w = io.WriteTransferCount / (1024.0 * 1024.0);
             snprintf(buf, sizeof(buf), "Total I/O: %.1f MB read / %.1f MB written", r, w);
-            SetWindowText(hLabelIO, buf);
+            SafeSetWindowText(hLabelIO, buf);
         }
 
         // Threads
@@ -390,13 +390,13 @@ INT_PTR CALLBACK ShowProcessDetailsDialogProc(HWND hDlg, UINT message, WPARAM wP
             CloseHandle(snap);
         }
         snprintf(buf, sizeof(buf), "Threads: %lu", threads);
-        SetWindowText(hLabelThreads, buf);
+        SafeSetWindowText(hLabelThreads, buf);
 
         // Handles
         DWORD count;
         if (GetProcessHandleCount(hProcess, &count)) {
             snprintf(buf, sizeof(buf), "Handles: %lu", count);
-            SetWindowText(hLabelHandles, buf);
+            SafeSetWindowText(hLabelHandles, buf);
         }
     }
 
