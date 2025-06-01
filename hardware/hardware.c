@@ -316,8 +316,8 @@ void UpdateUptimeInfo(HWND hLabelUptime) {
 int UpdateGPUInfo(HWND hLabelGpu) {
     HDEVINFO hDevInfo;
     SP_DEVINFO_DATA devInfoData;
-    char buffer[1024] = "";
-    char temp[256];
+    char buffer[2048] = "";
+    char temp[512];
     int gpuCount = 0;
 
     hDevInfo = SetupDiGetClassDevs(&GUID_DEVCLASS_DISPLAY, NULL, NULL, DIGCF_PRESENT);
@@ -329,20 +329,49 @@ int UpdateGPUInfo(HWND hLabelGpu) {
     devInfoData.cbSize = sizeof(SP_DEVINFO_DATA);
 
     for (int i = 0; SetupDiEnumDeviceInfo(hDevInfo, i, &devInfoData); i++) {
-        char deviceName[256];
-        if (SetupDiGetDeviceRegistryPropertyA(
-                hDevInfo,
-                &devInfoData,
-                SPDRP_DEVICEDESC,
-                NULL,
-                (PBYTE)deviceName,
-                sizeof(deviceName),
-                NULL)) {
+        char deviceName[256] = "Unknown";
+        char driverKey[256] = "";
+        char driverVersion[128] = "Unknown";
+        char driverDate[128] = "Unknown";
 
-            snprintf(temp, sizeof(temp), "GPU %d: %s\n", gpuCount + 1, deviceName);
-            strncat(buffer, temp, sizeof(buffer) - strlen(buffer) - 1);
-            gpuCount++;
+        // Nome da GPU
+        SetupDiGetDeviceRegistryPropertyA(
+            hDevInfo, &devInfoData, SPDRP_DEVICEDESC, NULL,
+            (PBYTE)deviceName, sizeof(deviceName), NULL);
+
+        // Nome da chave do driver
+        if (SetupDiGetDeviceRegistryPropertyA(
+                hDevInfo, &devInfoData, SPDRP_DRIVER, NULL,
+                (PBYTE)driverKey, sizeof(driverKey), NULL)) {
+
+            HKEY hKey;
+            char regPath[256];
+            snprintf(regPath, sizeof(regPath),
+                     "SYSTEM\\CurrentControlSet\\Control\\Class\\%s", driverKey);
+
+            if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, regPath, 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+                DWORD size = sizeof(driverVersion);
+                RegQueryValueExA(hKey, "DriverVersion", NULL, NULL, (LPBYTE)driverVersion, &size);
+
+               size = sizeof(driverDate);
+                if (RegQueryValueExA(hKey, "DriverDate", NULL, NULL, (LPBYTE)driverDate, &size) == ERROR_SUCCESS) {
+                    // Converte de MM/DD/YYYY para DD/MM/YYYY
+                    int mm, dd, yyyy;
+                    if (sscanf(driverDate, "%d-%d-%d", &mm, &dd, &yyyy) == 3) {
+                        snprintf(driverDate, sizeof(driverDate), "%02d/%02d/%04d", dd, mm, yyyy);
+                    }
+                }
+
+                RegCloseKey(hKey);
+            }
         }
+
+        snprintf(temp, sizeof(temp),
+                 "GPU %d: %s\n  Driver Version: %s\n  Driver Date: %s\n\n",
+                 gpuCount + 1, deviceName, driverVersion, driverDate);
+
+        strncat(buffer, temp, sizeof(buffer) - strlen(buffer) - 1);
+        gpuCount++;
     }
 
     SetupDiDestroyDeviceInfoList(hDevInfo);
@@ -467,12 +496,12 @@ void AddHardwarePanel(HWND hwndParent) {
 
     // Define altura com base no número de GPUs
     int gpuLineHeight  = 20;
-    int gpuGroupBoxHeight  = gpuCount * gpuLineHeight  + 20;
-    if (gpuGroupBoxHeight  < 75) gpuGroupBoxHeight  = 75;
+    int gpuBlockHeight = 4 * gpuLineHeight;
+    int gpuGroupBoxHeight = gpuCount * gpuBlockHeight;
 
     // Ajusta tamanho do GroupBox e do Label
-    SetWindowPos(hGpuGroup, NULL, 0, 0, RIGHT_COLUMN_WIDTH, gpuGroupBoxHeight , SWP_NOMOVE | SWP_NOZORDER);
-    SetWindowPos(hLabelGpu, NULL, 0, 0, RIGHT_COLUMN_WIDTH - 20, gpuGroupBoxHeight  - 30, SWP_NOMOVE | SWP_NOZORDER);
+    SetWindowPos(hGpuGroup, NULL, 0, 0, RIGHT_COLUMN_WIDTH, gpuGroupBoxHeight, SWP_NOMOVE | SWP_NOZORDER);
+    SetWindowPos(hLabelGpu, NULL, 0, 0, RIGHT_COLUMN_WIDTH - 20, gpuGroupBoxHeight - 30, SWP_NOMOVE | SWP_NOZORDER);
 
     // Atualiza yPosRight
     yPosRight += gpuGroupBoxHeight  + SECTION_SPACING;
