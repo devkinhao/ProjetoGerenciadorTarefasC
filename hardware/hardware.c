@@ -2,13 +2,21 @@
 #include "../utils/utils.h"
 
 
-#define SECTION_SPACING 10
+#define SECTION_SPACING 15
 #define GROUPBOX_HEIGHT 30
 #define ITEM_SPACING 25
 #define LEFT_COLUMN_WIDTH 350
 #define RIGHT_COLUMN_WIDTH 350
 
 #define GROUPBOX_TOP_MARGIN 25
+
+// Declare hbrBackground e clrBackground como externos (definidos em main.c)
+extern HBRUSH hbrBackground;
+extern COLORREF clrBackground;
+
+// Variável estática para guardar o procedimento de janela original de hHardwarePanel
+static WNDPROC g_lpfnOriginalHardwarePanelProc;
+
 
 typedef struct {
     HWND hGroup;
@@ -433,11 +441,48 @@ void UpdateSystemInfo(HWND hLabelSystem) {
     SafeSetWindowText(hLabelSystem, buffer);
 }
 
+// Novo procedimento de janela para hHardwarePanel
+LRESULT CALLBACK HardwarePanelProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    switch (msg) {
+        case WM_ERASEBKGND: {
+            // Pinta o fundo do próprio hHardwarePanel de branco
+            RECT rcClient;
+            GetClientRect(hwnd, &rcClient);
+            FillRect((HDC)wParam, &rcClient, hbrBackground);
+            return 1; // Indicamos que tratamos o fundo
+        }
+        case WM_CTLCOLORSTATIC: {
+            // Esta mensagem é enviada ao hHardwarePanel pelos seus filhos (labels e group boxes)
+            HDC hdcStatic = (HDC)wParam;
+            // HWND hStatic = (HWND)lParam; // Handle do controle estático filho
+
+            // Define a cor de fundo do controle filho como branco
+            SetBkColor(hdcStatic, clrBackground);
+            // Define a cor do texto do controle filho como preto
+            SetTextColor(hdcStatic, RGB(0, 0, 0));
+
+            // Retorna o pincel branco para pintar o fundo do controle filho
+            return (LRESULT)hbrBackground;
+        }
+        case WM_NCDESTROY:
+            // Quando a janela está sendo destruída, restaura o procedimento original.
+            // Isso é importante para evitar problemas se a memória da janela for reutilizada.
+            SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)g_lpfnOriginalHardwarePanelProc);
+            break;
+    }
+    // Chama o procedimento de janela original para o tratamento padrão de outras mensagens
+    return CallWindowProc(g_lpfnOriginalHardwarePanelProc, hwnd, msg, wParam, lParam);
+}
+
 void AddHardwarePanel(HWND hwndParent) {
     hHardwarePanel = CreateWindowEx(0, "STATIC", "", 
         WS_CHILD | WS_VISIBLE | SS_LEFT,
         0, 40, WINDOW_WIDTH - 20, WINDOW_HEIGHT - 50,
         hwndParent, NULL, GetModuleHandle(NULL), NULL);
+
+
+    g_lpfnOriginalHardwarePanelProc = (WNDPROC)SetWindowLongPtr(hHardwarePanel, GWLP_WNDPROC, (LONG_PTR)HardwarePanelProc);
+    
     ShowWindow(hHardwarePanel, SW_HIDE);
 
     int yPos = 10;

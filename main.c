@@ -8,12 +8,16 @@ SYSTEM_INFO sysInfo;
 int numProcessors;
 HWND hTab, hListView, hButtonEndTask, hHardwarePanel;
 HFONT hFontTabs, hFontButton;
+HBRUSH hbrBackground = NULL; // Pincel para o fundo
+COLORREF clrBackground = RGB(255, 255, 255); // Branco puro
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     switch (msg)
     {
     case WM_CREATE:
+        hbrBackground = CreateSolidBrush(clrBackground);
+
         AddTabs(hwnd);
         AddListView(hwnd);
         AddHardwarePanel(hwnd);
@@ -32,6 +36,29 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             UpdateEndTaskButtonState();
         }
         break;
+    }
+
+    case WM_CTLCOLORSTATIC: {
+        HWND hStatic = (HWND)lParam;
+        HDC hdcStatic = (HDC)wParam;
+
+        SetBkColor(hdcStatic, clrBackground);
+        SetTextColor(hdcStatic, RGB(0, 0, 0)); 
+           
+        return (LRESULT)GetStockObject(NULL_BRUSH); 
+    }
+
+    case WM_ERASEBKGND: {
+        
+        if (hwnd == hTab) { // Se a mensagem for para a própria aba (o tab control)
+            return 0; // Deixa o tab control desenhar a si mesmo
+        }
+
+        // Caso contrário, preencha o fundo com o pincel branco
+        RECT rcClient;
+        GetClientRect(hwnd, &rcClient);
+        FillRect((HDC)wParam, &rcClient, hbrBackground);
+        return 1; 
     }
 
     case WM_TIMER: {
@@ -61,6 +88,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
         break;
 
     case WM_DESTROY:
+        // Destrua o pincel quando a janela for fechada
+        if (hbrBackground) {
+            DeleteObject(hbrBackground);
+        }
         CleanupResources();
         PostQuitMessage(0);
         break;

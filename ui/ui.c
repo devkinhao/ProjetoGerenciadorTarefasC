@@ -23,7 +23,7 @@ void AddTabs(HWND hwndParent) {
 }
 
 void AddListView(HWND hwndParent) {
-    hListView = CreateWindowEx(WS_EX_CLIENTEDGE, WC_LISTVIEW, "",
+    hListView = CreateWindowEx(0, WC_LISTVIEW, "",
         WS_CHILD | WS_VISIBLE | LVS_REPORT | LVS_SINGLESEL,
         10, 40, LISTVIEW_WIDTH, LISTVIEW_HEIGHT,
         hwndParent, (HMENU)ID_LIST_VIEW, GetModuleHandle(NULL), NULL);
@@ -690,6 +690,7 @@ void ShowContextMenu(HWND hwndListView, HWND hwndParent, POINT pt) {
     ShowProcessDetailsDialog(hwndParent, hProcess, processName, pid);
 }
 
-    CloseHandle(hProcess);
+    DestroyMenu(hPriorityMenu);
     DestroyMenu(hMenu);
+    CloseHandle(hProcess);
 }
