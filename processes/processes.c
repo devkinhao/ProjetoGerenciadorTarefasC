@@ -69,13 +69,19 @@ void GetDiskUsage(HANDLE hProcess, char *diskBuffer, ProcessInfo *procInfo) {
 
     IO_COUNTERS ioCounters;
     if (GetProcessIoCounters(hProcess, &ioCounters)) {
+        ULONGLONG currentTime = GetTickCount64(); // tempo atual em milissegundos
+        ULONGLONG elapsedTime = currentTime - procInfo->lastIoCheckTime;
+
         ULONGLONG readDiff = ioCounters.ReadTransferCount - procInfo->prevReadBytes;
         ULONGLONG writeDiff = ioCounters.WriteTransferCount - procInfo->prevWriteBytes;
 
         procInfo->prevReadBytes = ioCounters.ReadTransferCount;
         procInfo->prevWriteBytes = ioCounters.WriteTransferCount;
+        procInfo->lastIoCheckTime = currentTime;
 
-        double mbps = (readDiff + writeDiff) / (1024.0 * 1024.0);
+        double seconds = elapsedTime / 1000.0;
+        double mbps = (seconds > 0.0) ? ((readDiff + writeDiff) / (1024.0 * 1024.0)) / seconds : 0.0;
+
         snprintf(diskBuffer, MAX_DISK_LENGTH, "%.1f MB/s", mbps);
     } else {
         snprintf(diskBuffer, MAX_DISK_LENGTH, NA_TEXT);
@@ -210,6 +216,7 @@ void UpdateProcessList() {
                 strncpy(processes[processCount].status, "Running", sizeof(processes[processCount].status) - 1);
                 strncpy(processes[processCount].cpu, NA_TEXT, sizeof(processes[processCount].cpu) - 1);
                 strncpy(processes[processCount].memory, NA_TEXT, sizeof(processes[processCount].memory) - 1);
+                strncpy(processes[processCount].disk, NA_TEXT, sizeof(processes[processCount].disk) - 1);
 
                 HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pe32.th32ProcessID);
                 if (hProcess) {

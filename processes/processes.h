@@ -25,6 +25,7 @@ typedef struct {
     FILETIME prevSystemUser;
     ULONGLONG prevReadBytes;
     ULONGLONG prevWriteBytes;
+    ULONGLONG lastIoCheckTime;
 } ProcessInfo;
 
 ULONGLONG DiffFileTimes(FILETIME ftA, FILETIME ftB);

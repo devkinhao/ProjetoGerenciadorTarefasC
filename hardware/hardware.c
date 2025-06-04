@@ -302,7 +302,7 @@ void UpdateOSInfo(HWND hLabelOs) {
 
 void UpdateUptimeInfo(HWND hLabelUptime) {
     char buffer[128];
-    ULONGLONG uptimeMillis = GetTickCount(); 
+    ULONGLONG uptimeMillis = GetTickCount64(); 
     ULONGLONG uptimeSecs = uptimeMillis / 1000;
     DWORD days = (DWORD)(uptimeSecs / 86400);
     DWORD hours = (DWORD)((uptimeSecs % 86400) / 3600);
