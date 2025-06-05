@@ -28,7 +28,7 @@ void AddListView(HWND hwndParent) {
         10, 40, LISTVIEW_WIDTH, LISTVIEW_HEIGHT,
         hwndParent, (HMENU)ID_LIST_VIEW, GetModuleHandle(NULL), NULL);
 
-    ListView_SetExtendedListViewStyle(hListView, LVS_EX_FULLROWSELECT);
+    ListView_SetExtendedListViewStyle(hListView, LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER);
 
     LVCOLUMN lvc;
     lvc.mask = LVCF_TEXT | LVCF_WIDTH;
