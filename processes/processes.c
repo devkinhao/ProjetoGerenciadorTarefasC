@@ -120,17 +120,33 @@ void GetProcessUser(HANDLE hProcess, char *userBuffer, DWORD bufferSize) {
     }
 }
 
+void GetProcessPath(HANDLE hProcess, char *pathBuffer, DWORD bufferSize) {
+    if (!hProcess) {
+        strncpy(pathBuffer, UNKNOWN_TEXT, bufferSize);
+        return;
+    }
+
+    HMODULE hMod;
+    DWORD cbNeeded;
+    if (EnumProcessModules(hProcess, &hMod, sizeof(hMod), &cbNeeded)) {
+        GetModuleFileNameEx(hProcess, hMod, pathBuffer, bufferSize);
+    } else {
+        strncpy(pathBuffer, UNKNOWN_TEXT, bufferSize);
+    }
+}
+
 void UpdateProcessInfo(int processIndex, HANDLE hProcess) {
     if (!hProcess) return;
 
     char user[64] = UNKNOWN_TEXT;
     char pidText[16];
+    char processPath[MAX_PATH_LENGTH] = UNKNOWN_TEXT;
 
     GetProcessUser(hProcess, user, sizeof(user));
     _itoa(processes[processIndex].pid, pidText, 10);
+    GetProcessPath(hProcess, processPath, sizeof(processPath)); 
 
-    // Atualizar somente se diferente
-    char currentText[64];
+    char currentText[MAX_PATH_LENGTH]; 
 
     ListView_GetItemText(hListView, processIndex, 1, currentText, sizeof(currentText));
     if (strcmp(currentText, user) != 0)
@@ -143,6 +159,12 @@ void UpdateProcessInfo(int processIndex, HANDLE hProcess) {
     ListView_GetItemText(hListView, processIndex, 3, currentText, sizeof(currentText));
     if (strcmp(currentText, "Running") != 0)
         ListView_SetItemText(hListView, processIndex, 3, "Running");
+
+    ListView_GetItemText(hListView, processIndex, 7, currentText, sizeof(currentText));
+    if (strcmp(currentText, processPath) != 0) {
+        ListView_SetItemText(hListView, processIndex, 7, processPath);
+        strncpy(processes[processIndex].path, processPath, sizeof(processes[processIndex].path) - 1);
+    }
 }
 
 void UpdateProcessMetrics(int processIndex, HANDLE hProcess) {
@@ -217,6 +239,7 @@ void UpdateProcessList() {
                 strncpy(processes[processCount].cpu, NA_TEXT, sizeof(processes[processCount].cpu) - 1);
                 strncpy(processes[processCount].memory, NA_TEXT, sizeof(processes[processCount].memory) - 1);
                 strncpy(processes[processCount].disk, NA_TEXT, sizeof(processes[processCount].disk) - 1);
+                strncpy(processes[processCount].path, UNKNOWN_TEXT, sizeof(processes[processCount].path) - 1);
 
                 HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pe32.th32ProcessID);
                 if (hProcess) {
@@ -224,11 +247,12 @@ void UpdateProcessList() {
                     UpdateProcessMetrics(processCount, hProcess);
                     CloseHandle(hProcess);
                 } else {
-                    char user[64] = UNKNOWN_TEXT, pidText[16];
+                    char user[64] = UNKNOWN_TEXT, pidText[16], processPath[MAX_PATH_LENGTH] = UNKNOWN_TEXT;
                     _itoa(pe32.th32ProcessID, pidText, 10);
                     ListView_SetItemText(hListView, processCount, 1, user);
                     ListView_SetItemText(hListView, processCount, 2, pidText);
                     ListView_SetItemText(hListView, processCount, 3, "Access Denied");
+                    ListView_SetItemText(hListView, processCount, 7, processPath);
                 }
 
                 processExists[processCount] = true;

@@ -9,6 +9,7 @@
 #define MAX_CPU_LENGTH 16
 #define MAX_MEMORY_LENGTH 32
 #define MAX_DISK_LENGTH 16
+#define MAX_PATH_LENGTH 260
 #define UNKNOWN_TEXT "Unknown"
 #define NA_TEXT "N/A"
 
@@ -19,6 +20,7 @@ typedef struct {
     char cpu[MAX_CPU_LENGTH];
     char memory[MAX_MEMORY_LENGTH];
     char disk[MAX_DISK_LENGTH];
+    char path[MAX_PATH_LENGTH];
     FILETIME prevKernel;
     FILETIME prevUser;
     FILETIME prevSystemKernel;
