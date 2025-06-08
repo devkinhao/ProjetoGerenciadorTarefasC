@@ -406,25 +406,24 @@ INT_PTR CALLBACK ShowProcessDetailsDialogProc(HWND hDlg, UINT message, WPARAM wP
         pid = ((AffinityDialogParams*)lParam)->pid;
         strncpy(processName, ((AffinityDialogParams*)lParam)->processName, MAX_PATH);
 
-        char fullPath[MAX_PATH] = "Unknown";
         char description[256] = "Unknown";
         char company[256] = "Unknown";
         char timeStr[64] = "Unavailable";
         char bitnessStr[16] = "Unknown";
 
-        // Caminho completo do executável
+        // Descrição e empresa
+        DWORD verHandle = 0;
+        char fullPathForVersionInfo[MAX_PATH] = {0}; // Temporary buffer for path if needed for version info
         HMODULE hMod;
         DWORD cbNeeded;
         if (EnumProcessModules(hProcess, &hMod, sizeof(hMod), &cbNeeded)) {
-            GetModuleFileNameEx(hProcess, hMod, fullPath, sizeof(fullPath));
+            GetModuleFileNameEx(hProcess, hMod, fullPathForVersionInfo, sizeof(fullPathForVersionInfo));
         }
 
-        // Descrição e empresa
-        DWORD verHandle = 0;
-        DWORD verSize = GetFileVersionInfoSize(fullPath, &verHandle);
+        DWORD verSize = GetFileVersionInfoSize(fullPathForVersionInfo, &verHandle);
         if (verSize > 0) {
             BYTE* verData = (BYTE*)malloc(verSize);
-            if (GetFileVersionInfo(fullPath, verHandle, verSize, verData)) {
+            if (GetFileVersionInfo(fullPathForVersionInfo, verHandle, verSize, verData)) {
                 struct LANGANDCODEPAGE {
                     WORD wLanguage;
                     WORD wCodePage;
@@ -489,7 +488,7 @@ INT_PTR CALLBACK ShowProcessDetailsDialogProc(HWND hDlg, UINT message, WPARAM wP
         //
         // 🔷 Group Box 1 – Informações estáticas
         //
-        int staticGroupHeight = 22 * 7 + 20; // 7 linhas + margem inferior
+        int staticGroupHeight = 22 * 6 + 20; // 6 linhas + margem inferior
         HWND hGroupStatic = CreateWindow("BUTTON", "Static Information", WS_CHILD | WS_VISIBLE | BS_GROUPBOX,
             margin, y, clientWidth - 2 * margin, staticGroupHeight, hDlg, NULL, GetModuleHandle(NULL), NULL);
         SendMessage(hGroupStatic, WM_SETFONT, (WPARAM)hFont, TRUE);
@@ -517,11 +516,6 @@ INT_PTR CALLBACK ShowProcessDetailsDialogProc(HWND hDlg, UINT message, WPARAM wP
         HWND hStaticComp = CreateWindow("STATIC", buffer, WS_CHILD | WS_VISIBLE | SS_LEFT,
             x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL);
         SendMessage(hStaticComp, WM_SETFONT, (WPARAM)hFont, TRUE); y += 22;
-
-        snprintf(buffer, sizeof(buffer), "Path: %s", fullPath);
-        HWND hStaticPath = CreateWindow("STATIC", buffer, WS_CHILD | WS_VISIBLE | SS_LEFT | SS_ENDELLIPSIS,
-            x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL);
-        SendMessage(hStaticPath, WM_SETFONT, (WPARAM)hFont, TRUE); y += 22;
 
         snprintf(buffer, sizeof(buffer), "Start Time: %s", timeStr);
         HWND hStaticStart = CreateWindow("STATIC", buffer, WS_CHILD | WS_VISIBLE | SS_LEFT,
