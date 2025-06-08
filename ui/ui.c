@@ -24,7 +24,7 @@ void AddTabs(HWND hwndParent, int width, int height) {
 
 void AddListView(HWND hwndParent, int width, int height) {
     hListView = CreateWindowEx(0, WC_LISTVIEW, "",
-        WS_CHILD | WS_VISIBLE | LVS_REPORT | LVS_SINGLESEL,
+        WS_CHILD | WS_VISIBLE | LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS,
         10, 40, width - 25, height - 121,
         hwndParent, (HMENU)ID_LIST_VIEW, GetModuleHandle(NULL), NULL);
 
