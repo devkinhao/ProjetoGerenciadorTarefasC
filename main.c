@@ -154,10 +154,11 @@ int main() {
 
     ShowWindow(hwnd, SW_SHOW);
     UpdateWindow(hwnd);
-    UpdateProcessList();
-
+    
     EnableDebugPrivilege();
     InitializeSystemInfo();
+    
+    UpdateProcessList();
 
     MSG msg;
     while (GetMessage(&msg, NULL, 0, 0)) {
