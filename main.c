@@ -8,8 +8,12 @@ SYSTEM_INFO sysInfo;
 int numProcessors;
 HWND hTab, hListView, hButtonEndTask, hHardwarePanel;
 HFONT hFontTabs, hFontButton;
-HBRUSH hbrBackground = NULL; // Pincel para o fundo
-COLORREF clrBackground = RGB(255, 255, 255); // Branco puro
+HBRUSH hbrBackground = NULL;
+COLORREF clrBackground = RGB(255, 255, 255);
+
+// Definições de largura e altura da janela principal
+int gWindowWidth = 1280;
+int gWindowHeight = 720;
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
@@ -18,10 +22,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
     case WM_CREATE:
         hbrBackground = CreateSolidBrush(clrBackground);
 
-        AddTabs(hwnd);
-        AddListView(hwnd);
+        AddTabs(hwnd, gWindowWidth, gWindowHeight);
+        AddListView(hwnd, gWindowWidth, gWindowHeight);
         AddHardwarePanel(hwnd);
-        AddFooter(hwnd);
+        AddFooter(hwnd, gWindowWidth, gWindowHeight);
         SetupTimer(hwnd);
         break;
 
@@ -49,12 +53,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
     }
 
     case WM_ERASEBKGND: {
-        
-        if (hwnd == hTab) { // Se a mensagem for para a própria aba (o tab control)
-            return 0; // Deixa o tab control desenhar a si mesmo
+        if (hwnd == hTab) {
+            return 0;
         }
-
-        // Caso contrário, preencha o fundo com o pincel branco
         RECT rcClient;
         GetClientRect(hwnd, &rcClient);
         FillRect((HDC)wParam, &rcClient, hbrBackground);
@@ -79,7 +80,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             ShowContextMenu(hListView, hwnd, pt);
         }
         break;
-    
+
     case WM_COMMAND:
         if (LOWORD(wParam) == ID_END_TASK_BUTTON)
         {
@@ -88,7 +89,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
         break;
 
     case WM_DESTROY:
-        // Destrua o pincel quando a janela for fechada
         if (hbrBackground) {
             DeleteObject(hbrBackground);
         }
@@ -106,7 +106,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 void EnableDebugPrivilege() {
     HANDLE hToken;
     TOKEN_PRIVILEGES tp;
-    
+
     if (OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &hToken)) {
         LookupPrivilegeValue(NULL, SE_DEBUG_NAME, &tp.Privileges[0].Luid);
         tp.PrivilegeCount = 1;
@@ -123,6 +123,11 @@ void InitializeSystemInfo() {
 }
 
 int main() {
+    /*RECT workArea;
+    SystemParametersInfo(SPI_GETWORKAREA, 0, &workArea, 0);
+    gWindowWidth = (int)(workArea.right * 0.90);
+    gWindowHeight = (int)(workArea.bottom * 0.80);*/
+
     WNDCLASS wc = {0};
     wc.lpfnWndProc = WndProc;
     wc.hInstance = GetModuleHandle(NULL);
@@ -132,38 +137,30 @@ int main() {
     HWND hwnd = CreateWindow(wc.lpszClassName, "Task Manager", 
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_CLIPCHILDREN | WS_CLIPSIBLINGS,
         CW_USEDEFAULT, CW_USEDEFAULT, 
-        WINDOW_WIDTH, WINDOW_HEIGHT, 
+        gWindowWidth, gWindowHeight, 
         NULL, NULL, wc.hInstance, NULL);
 
-    if (!hwnd)
-    {
+    if (!hwnd) {
         MessageBox(NULL, "Error creating window!", "Error", MB_ICONERROR | MB_OK);
         return 1;
     }
 
-    // Remover o botão de maximizar (WS_MAXIMIZEBOX) após a criação da janela
     LONG_PTR style = GetWindowLongPtr(hwnd, GWL_STYLE);
-    style &= ~WS_MAXIMIZEBOX;  // Remove o botão de maximizar
-    style &= ~WS_SIZEBOX;      // Remove o redimensionamento
+    style &= ~WS_MAXIMIZEBOX;
+    style &= ~WS_SIZEBOX;
     SetWindowLongPtr(hwnd, GWL_STYLE, style);
 
-    // Definir a posição e tamanho fixos da janela
-    SetWindowPos(hwnd, NULL, CW_USEDEFAULT, CW_USEDEFAULT, WINDOW_WIDTH, WINDOW_HEIGHT, SWP_NOZORDER | SWP_NOMOVE);
-
-    // Ativa a permissão de depuração para acessar processos do SYSTEM
-    EnableDebugPrivilege();
-
-    InitializeSystemInfo();
-    // Centraliza a janela
-    CenterWindowToScreen(hwnd, WINDOW_WIDTH, WINDOW_HEIGHT);
+    CenterWindowToScreen(hwnd, gWindowWidth, gWindowHeight);
 
     ShowWindow(hwnd, SW_SHOW);
     UpdateWindow(hwnd);
     UpdateProcessList();
 
+    EnableDebugPrivilege();
+    InitializeSystemInfo();
+
     MSG msg;
-    while (GetMessage(&msg, NULL, 0, 0))
-    {
+    while (GetMessage(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }

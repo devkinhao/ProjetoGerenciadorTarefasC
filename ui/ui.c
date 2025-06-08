@@ -5,10 +5,10 @@
 
 static HWND* checkboxes = NULL;
 
-void AddTabs(HWND hwndParent) {
+void AddTabs(HWND hwndParent, int width, int height) {
     hTab = CreateWindowEx(0, WC_TABCONTROL, "",
         WS_CHILD | WS_VISIBLE,
-        0, 0, WINDOW_WIDTH, WINDOW_HEIGHT,
+        0, 0, width, height,
         hwndParent, (HMENU)ID_TAB_CONTROL, GetModuleHandle(NULL), NULL);
 
     TCITEM tie;
@@ -22,10 +22,10 @@ void AddTabs(HWND hwndParent) {
     SendMessage(hTab, WM_SETFONT, (WPARAM)hFontTabs, TRUE);
 }
 
-void AddListView(HWND hwndParent) {
+void AddListView(HWND hwndParent, int width, int height) {
     hListView = CreateWindowEx(0, WC_LISTVIEW, "",
         WS_CHILD | WS_VISIBLE | LVS_REPORT | LVS_SINGLESEL,
-        10, 40, LISTVIEW_WIDTH, LISTVIEW_HEIGHT,
+        10, 40, width - 25, height - 121,
         hwndParent, (HMENU)ID_LIST_VIEW, GetModuleHandle(NULL), NULL);
 
     ListView_SetExtendedListViewStyle(hListView, LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER);
@@ -44,12 +44,12 @@ void AddListView(HWND hwndParent) {
     }
 }
 
-void AddFooter(HWND hwndParent) {
+void AddFooter(HWND hwndParent, int width, int height) {
     const int buttonWidth = 85;
     const int buttonHeight = 22;
 
-    int x = WINDOW_WIDTH - buttonWidth - 15;  
-    int y = WINDOW_HEIGHT - buttonHeight - 40; 
+    int x = width - buttonWidth - 15;  
+    int y = height - buttonHeight - 40; 
 
     hButtonEndTask = CreateWindowEx(0, "BUTTON", "End Task",
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,

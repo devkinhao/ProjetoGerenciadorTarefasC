@@ -5,14 +5,10 @@
 #define _WIN32_IE 0x0700 // Mínimo para IE7, geralmente bom para controles modernos
 #define _WIN32_WINNT 0x0A00 // Windows 10 para os recursos mais recentes
 
-// Tamanho da janela principal
-#define WINDOW_WIDTH 765
-#define WINDOW_HEIGHT 728
-
 // Interface gráfica
 #define FONT_SIZE 15
-#define LISTVIEW_WIDTH 740
-#define LISTVIEW_HEIGHT 615
+extern int gWindowWidth;
+extern int gWindowHeight;
 
 // Identificadores de controles
 #define ID_TAB_CONTROL     1001

@@ -9,9 +9,9 @@ typedef struct {
     DWORD pid;
 } AffinityDialogParams;
 
-void AddTabs(HWND hwndParent);
-void AddListView(HWND hwndParent);
-void AddFooter(HWND hwndParent);
+void AddTabs(HWND hwndParent, int width, int height);
+void AddListView(HWND hwndParent, int width, int height);
+void AddFooter(HWND hwndParent, int width, int height);
 void SetupTimer(HWND hwnd);
 void OnTabSelectionChanged(HWND hwndParent, int selectedTab);
 void CleanupResources();
