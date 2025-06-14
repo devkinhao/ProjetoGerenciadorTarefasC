@@ -9,6 +9,7 @@ typedef struct {
     DWORD pid;
 } AffinityDialogParams;
 
+void CenterDialogInParent(HWND hDlg, HWND hwndParent);
 void AddTabs(HWND hwndParent, int width, int height);
 void AddListView(HWND hwndParent, int width, int height);
 void AddFooter(HWND hwndParent, int width, int height);

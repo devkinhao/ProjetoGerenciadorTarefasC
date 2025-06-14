@@ -5,6 +5,25 @@
 
 static HWND* checkboxes = NULL;
 
+void CenterDialogInParent(HWND hDlg, HWND hwndParent) {
+    RECT rcDlg, rcParent;
+    int dlgWidth, dlgHeight, parentWidth, parentHeight;
+    int newX, newY;
+
+    GetWindowRect(hDlg, &rcDlg);
+    GetWindowRect(hwndParent, &rcParent);
+
+    dlgWidth = rcDlg.right - rcDlg.left;
+    dlgHeight = rcDlg.bottom - rcDlg.top;
+    parentWidth = rcParent.right - rcParent.left;
+    parentHeight = rcParent.bottom - rcParent.top;
+
+    newX = rcParent.left + (parentWidth - dlgWidth) / 2;
+    newY = rcParent.top + (parentHeight - dlgHeight) / 2;
+
+    SetWindowPos(hDlg, NULL, newX, newY, 0, 0, SWP_NOZORDER | SWP_NOSIZE);
+}
+
 void AddTabs(HWND hwndParent, int width, int height) {
     hTab = CreateWindowEx(0, WC_TABCONTROL, "",
         WS_CHILD | WS_VISIBLE,
@@ -217,6 +236,7 @@ INT_PTR CALLBACK AffinityDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPAR
             SendMessage(hCancel, WM_SETFONT, (WPARAM)hFont, TRUE);
 
             UpdateOkButtonState(hDlg, hOk);
+            CenterDialogInParent(hDlg, GetParent(hDlg));
 
             return TRUE;
         }
@@ -498,7 +518,7 @@ INT_PTR CALLBACK ShowProcessDetailsDialogProc(HWND hDlg, UINT message, WPARAM wP
         int labelWidth = clientWidth - 2 * (margin + groupPadding);
 
         snprintf(buffer, sizeof(buffer), "Process: %s", processName);
-        HWND hStaticName = CreateWindow("STATIC", buffer, WS_CHILD | WS_VISIBLE | SS_LEFT,
+        HWND hStaticName = CreateWindow("STATIC", buffer, WS_CHILD | WS_VISIBLE | SS_LEFT | SS_ENDELLIPSIS,
             x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL);
         SendMessage(hStaticName, WM_SETFONT, (WPARAM)hFont, TRUE); y += 22;
 
@@ -513,7 +533,7 @@ INT_PTR CALLBACK ShowProcessDetailsDialogProc(HWND hDlg, UINT message, WPARAM wP
         SendMessage(hStaticDesc, WM_SETFONT, (WPARAM)hFont, TRUE); y += 22;
 
         snprintf(buffer, sizeof(buffer), "Company: %s", company);
-        HWND hStaticComp = CreateWindow("STATIC", buffer, WS_CHILD | WS_VISIBLE | SS_LEFT,
+        HWND hStaticComp = CreateWindow("STATIC", buffer, WS_CHILD | WS_VISIBLE | SS_LEFT | SS_ENDELLIPSIS,
             x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL);
         SendMessage(hStaticComp, WM_SETFONT, (WPARAM)hFont, TRUE); y += 22;
 
@@ -578,7 +598,9 @@ INT_PTR CALLBACK ShowProcessDetailsDialogProc(HWND hDlg, UINT message, WPARAM wP
         SendMessage(hClose, WM_SETFONT, (WPARAM)hFont, TRUE);
 
         UpdateDynamicLabels();
+        CenterDialogInParent(hDlg, GetParent(hDlg));
         SetTimer(hDlg, 1, 1000, NULL);
+
         return TRUE;
 
     }
