@@ -10,7 +10,9 @@
         "sysinfoapi.h": "c",
         "utils.h": "c",
         "stdlib.h": "c",
-        "time.h": "c"
+        "time.h": "c",
+        "setupapi.h": "c",
+        "iphlpapi.h": "c"
     },
     "C_Cpp.errorSquiggles": "disabled"
 }

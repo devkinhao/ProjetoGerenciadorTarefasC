@@ -36,10 +36,14 @@ typedef struct {
 } CpuControls;
 
 static CpuControls cpuControls;
-HWND hRamGroup, hDiskGroup, hOsGroup, hGpuGroup, hBatteryGroup, hSystemGroup;
-HWND hLabelRam, hLabelDisk, hLabelOs, hLabelGpu, hLabelBattery, hLabelSystem, hLabelUptime;
+HWND hRamGroup, hDiskGroup, hOsGroup, hGpuGroup, hBatteryGroup, hSystemGroup, hNetworkGroup;
+HWND hLabelRam, hLabelDisk, hLabelOs, hLabelGpu, hLabelBattery, hLabelSystem, hLabelUptime, hLabelNetwork;
 
 static FILETIME prevIdleTime = {0}, prevKernelTime = {0}, prevUserTime = {0};
+
+// Variáveis globais para armazenar os valores anteriores
+static DWORD64 prevIn = 0, prevOut = 0;
+static ULONGLONG prevTime = 0;
 
 BOOL Is64BitWindows() {
 #if defined(_WIN64)
@@ -482,6 +486,123 @@ void UpdateSystemInfo(HWND hLabelSystem) {
     SafeSetWindowText(hLabelSystem, buffer);
 }
 
+DWORD GetDefaultInterfaceIndex() {
+    PMIB_IPFORWARDTABLE pIpForwardTable = NULL;
+    DWORD dwSize = 0;
+    DWORD dwIndex = (DWORD)-1;
+
+    // Obter a tabela de roteamento
+    if (GetIpForwardTable(pIpForwardTable, &dwSize, FALSE) == ERROR_INSUFFICIENT_BUFFER) {
+        pIpForwardTable = (PMIB_IPFORWARDTABLE)malloc(dwSize);
+        if (pIpForwardTable) {
+            if (GetIpForwardTable(pIpForwardTable, &dwSize, FALSE) == NO_ERROR) {
+                // Procurar pela rota padrão (0.0.0.0)
+                for (DWORD i = 0; i < pIpForwardTable->dwNumEntries; i++) {
+                    if (pIpForwardTable->table[i].dwForwardDest == 0) {
+                        dwIndex = pIpForwardTable->table[i].dwForwardIfIndex;
+                        break;
+                    }
+                }
+            }
+            free(pIpForwardTable);
+        }
+    }
+    return dwIndex;
+}
+
+void GetNetworkUsage(char* outBuffer, size_t bufSize) {
+    PMIB_IFTABLE pIfTable = NULL;
+    PIP_ADAPTER_INFO pAdapterInfo = NULL;
+    PMIB_IPFORWARDTABLE pIpForwardTable = NULL;
+    DWORD dwSize = 0;
+    char ipAddress[16] = "N/A";
+    char adapterName[256] = "N/A";
+    const int maxAdapterNameLength = 45; // Máximo de caracteres para o nome do adaptador
+
+    // Obter informações dos adaptadores para pegar IP e nome
+    dwSize = 0;
+    if (GetAdaptersInfo(NULL, &dwSize) == ERROR_BUFFER_OVERFLOW) {
+        pAdapterInfo = (PIP_ADAPTER_INFO)malloc(dwSize);
+        if (pAdapterInfo && GetAdaptersInfo(pAdapterInfo, &dwSize) == NO_ERROR) {
+            PIP_ADAPTER_INFO pAdapter = pAdapterInfo;
+            while (pAdapter) {
+                if (pAdapter->IpAddressList.IpAddress.String[0] != '0') {
+                    // Trunca o nome do adaptador se for muito longo
+                    if (strlen(pAdapter->Description) > maxAdapterNameLength) {
+                        _snprintf(adapterName, sizeof(adapterName), "%.*s...", 
+                                 maxAdapterNameLength - 3, pAdapter->Description);
+                    } else {
+                        strncpy(adapterName, pAdapter->Description, sizeof(adapterName) - 1);
+                    }
+                    
+                    strncpy(ipAddress, pAdapter->IpAddressList.IpAddress.String, sizeof(ipAddress) - 1);
+                    break;
+                }
+                pAdapter = pAdapter->Next;
+            }
+        }
+    }
+
+    // Obter interface padrão
+    DWORD dwDefaultIfIndex = (DWORD)-1;
+    dwSize = 0;
+    if (GetIpForwardTable(NULL, &dwSize, FALSE) == ERROR_INSUFFICIENT_BUFFER) {
+        pIpForwardTable = (PMIB_IPFORWARDTABLE)malloc(dwSize);
+        if (pIpForwardTable && GetIpForwardTable(pIpForwardTable, &dwSize, FALSE) == NO_ERROR) {
+            for (DWORD i = 0; i < pIpForwardTable->dwNumEntries; i++) {
+                if (pIpForwardTable->table[i].dwForwardDest == 0) {
+                    dwDefaultIfIndex = pIpForwardTable->table[i].dwForwardIfIndex;
+                    break;
+                }
+            }
+        }
+    }
+
+    // Obter estatísticas de rede
+    DWORD64 totalIn = 0, totalOut = 0;
+    dwSize = 0;
+    if (GetIfTable(NULL, &dwSize, FALSE) == ERROR_INSUFFICIENT_BUFFER) {
+        pIfTable = (MIB_IFTABLE*)malloc(dwSize);
+        if (pIfTable && GetIfTable(pIfTable, &dwSize, FALSE) == NO_ERROR) {
+            for (DWORD i = 0; i < pIfTable->dwNumEntries; i++) {
+                MIB_IFROW* row = &pIfTable->table[i];
+                if (dwDefaultIfIndex == (DWORD)-1 || row->dwIndex == dwDefaultIfIndex) {
+                    totalIn += row->dwInOctets;
+                    totalOut += row->dwOutOctets;
+                    if (dwDefaultIfIndex != (DWORD)-1) break;
+                }
+            }
+        }
+    }
+
+    // Calcular velocidade
+    ULONGLONG currentTime = GetTickCount64();
+    double elapsedSec = (currentTime - prevTime) / 1000.0;
+    double inKbps = 0.0, outKbps = 0.0;
+
+    if (prevTime != 0 && elapsedSec > 0.0) {
+        inKbps = (totalIn - prevIn) * 8.0 / 1000.0 / elapsedSec;
+        outKbps = (totalOut - prevOut) * 8.0 / 1000.0 / elapsedSec;
+    }
+
+    prevIn = totalIn;
+    prevOut = totalOut;
+    prevTime = currentTime;
+
+    // Formatar saída
+    _snprintf(outBuffer, bufSize, 
+             "Adapter: %s\n"
+             "IPv4: %s\n"
+             "Receive: %.1f Kbps\n"
+             "Send: %.1f Kbps", 
+             adapterName, ipAddress, inKbps, outKbps);
+
+    // Liberar memória
+    if (pIfTable) free(pIfTable);
+    if (pAdapterInfo) free(pAdapterInfo);
+    if (pIpForwardTable) free(pIpForwardTable);
+}
+
 // Novo procedimento de janela para hHardwarePanel
 LRESULT CALLBACK HardwarePanelProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
@@ -598,7 +719,11 @@ void AddHardwarePanel(HWND hwndParent) {
 
     hSystemGroup = CreateGroupBox(hHardwarePanel, "System", LEFT_COLUMN_WIDTH + 20 + 12.5, yPosRight, RIGHT_COLUMN_WIDTH, 75);
     hLabelSystem = CreateLabel(hHardwarePanel, "Computer: Loading...\nUser: Loading...", LEFT_COLUMN_WIDTH + 42.5, yPosRight + GROUPBOX_TOP_MARGIN, RIGHT_COLUMN_WIDTH - 20, 45, SS_LEFT);
-    
+    yPosRight += 75 + SECTION_SPACING;
+
+    hNetworkGroup = CreateGroupBox(hHardwarePanel, "Network", LEFT_COLUMN_WIDTH + 20 + 12.5, yPosRight, RIGHT_COLUMN_WIDTH, 100);
+    hLabelNetwork = CreateLabel(hHardwarePanel, "Receive: ...\nSend: ...", LEFT_COLUMN_WIDTH + 42.5, yPosRight + GROUPBOX_TOP_MARGIN, RIGHT_COLUMN_WIDTH - 20, 70, SS_LEFT);
+
     hLabelUptime = CreateLabel(hHardwarePanel, "Uptime: Loading...", 0, gWindowHeight - 100, gWindowWidth, 20, SS_CENTER);
 
 }
@@ -612,4 +737,7 @@ void UpdateHardwareInfo() {
     UpdateGPUInfo(hLabelGpu);
     UpdateBatteryInfo(hLabelBattery);
     UpdateSystemInfo(hLabelSystem);
+    char netBuffer[128];
+    GetNetworkUsage(netBuffer, sizeof(netBuffer));
+    SafeSetWindowText(hLabelNetwork, netBuffer);
 }

@@ -17,6 +17,8 @@ void UpdateUptimeInfo(HWND hLabelUptime);
 int UpdateGPUInfo(HWND hLabelGpu);
 void UpdateBatteryInfo(HWND hLabelBattery);
 void UpdateSystemInfo(HWND hLabelSystem);
+DWORD GetDefaultInterfaceIndex();
+void GetNetworkUsage(char* outBuffer, size_t bufSize);
 void AddHardwarePanel(HWND hwndParent);
 void UpdateHardwareInfo(void);
 

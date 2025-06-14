@@ -40,6 +40,7 @@ extern int gWindowHeight;
 #include <regstr.h>   
 #include <UxTheme.h>
 
+#pragma comment(lib, "ws2_32.lib")
 #pragma comment(lib, "setupapi.lib")
 #pragma comment(lib, "Shlwapi.lib")
 #pragma comment(lib, "dxgi.lib")
