@@ -255,11 +255,30 @@ int UpdateDiskInfo(HWND hDiskLabel) {
     for (char letter = 'A'; letter <= 'Z'; ++letter) {
         if (drives & (1 << (letter - 'A'))) {
             char rootPath[4] = { letter, ':', '\\', '\0' };
+            char volumeName[MAX_PATH] = {0};
+            char typeStr[16] = "Unknown";
 
             ULARGE_INTEGER freeBytesAvailable, totalBytes, totalFreeBytes;
-            char volumeName[MAX_PATH] = {0};
 
             GetVolumeInformationA(rootPath, volumeName, MAX_PATH, NULL, NULL, NULL, NULL, 0);
+
+            // Obter tipo de disco (SSD ou HDD)
+            char drivePath[7];
+            snprintf(drivePath, sizeof(drivePath), "\\\\.\\%c:", letter);
+            HANDLE hDevice = CreateFileA(drivePath, 0, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                         NULL, OPEN_EXISTING, 0, NULL);
+            if (hDevice != INVALID_HANDLE_VALUE) {
+                STORAGE_PROPERTY_QUERY query = { StorageDeviceSeekPenaltyProperty, PropertyStandardQuery };
+                DEVICE_SEEK_PENALTY_DESCRIPTOR seekPenalty = { 0 };
+                DWORD bytesReturned;
+
+                if (DeviceIoControl(hDevice, IOCTL_STORAGE_QUERY_PROPERTY, &query, sizeof(query),
+                                    &seekPenalty, sizeof(seekPenalty), &bytesReturned, NULL)) {
+                    strcpy(typeStr, seekPenalty.IncursSeekPenalty ? "HDD" : "SSD");
+                }
+
+                CloseHandle(hDevice);
+            }
 
             if (GetDiskFreeSpaceEx(rootPath, &freeBytesAvailable, &totalBytes, &totalFreeBytes)) {
                 double totalGB = (double)totalBytes.QuadPart / (1024 * 1024 * 1024);
@@ -267,12 +286,12 @@ int UpdateDiskInfo(HWND hDiskLabel) {
 
                 if (volumeName[0]) {
                     snprintf(temp, sizeof(temp),
-                        "Disco %c (%s): %.2f GB free / %.2f GB total\n",
-                        letter, volumeName, freeGB, totalGB);
+                        "Disco %c (%s): %.2f GB free / %.2f GB total (%s)\n",
+                        letter, volumeName, freeGB, totalGB, typeStr);
                 } else {
                     snprintf(temp, sizeof(temp),
-                        "Disco %c: %.2f GB free / %.2f GB total\n",
-                        letter, freeGB, totalGB);
+                        "Disco %c: %.2f GB free / %.2f GB total (%s)\n",
+                        letter, freeGB, totalGB, typeStr);
                 }
 
                 strncat(buffer, temp, sizeof(buffer) - strlen(buffer) - 1);
