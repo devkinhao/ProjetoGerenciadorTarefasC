@@ -1,20 +1,29 @@
-#include <windows.h>
+#include <windows.h>  // Inclusão do header principal da API do Windows
 
-1           RT_MANIFEST         "app.manifest"
+// Recurso de manifesto para controle de compatibilidade com versões do Windows
+// O arquivo app.manifest contém configurações de compatibilidade e requisitos do sistema
+1 RT_MANIFEST "app.manifest"
 
-101 DIALOGEX 0, 0, 230, 190
-STYLE DS_SETFONT | WS_POPUP | WS_CAPTION | WS_SYSMENU
-CAPTION "Processor Affinity"
-FONT 8, "Segoe UI"
+// Definição do diálogo para configuração de afinidade de processador (ID 101)
+101 DIALOGEX 0, 0, 230, 190  // ID do recurso, posição (0,0), largura 230, altura 190
+STYLE DS_SETFONT | WS_POPUP | WS_CAPTION | WS_SYSMENU  // Estilos:
+    // DS_SETFONT - Permite especificar a fonte
+    // WS_POPUP - Cria uma janela pop-up
+    // WS_CAPTION - Adiciona barra de título
+    // WS_SYSMENU - Adiciona menu de sistema (botão fechar)
+CAPTION "Processor Affinity"  // Título da janela
+FONT 8, "Segoe UI"  // Fonte padrão: tamanho 8, família Segoe UI
 BEGIN
     // Nenhum controle aqui, tudo será criado no WM_INITDIALOG
+    // Os controles são criados dinamicamente no código para se adaptar ao número de processadores
 END
 
-102 DIALOGEX 0, 0, 230, 270
-STYLE DS_SETFONT | WS_POPUP | WS_CAPTION | WS_SYSMENU
-CAPTION "Process Details"
-FONT 8, "Segoe UI"
+// Definição do diálogo para exibição de detalhes do processo (ID 102)
+102 DIALOGEX 0, 0, 230, 270  // ID do recurso, posição (0,0), largura 230, altura 270
+STYLE DS_SETFONT | WS_POPUP | WS_CAPTION | WS_SYSMENU  // Mesmos estilos do diálogo anterior
+CAPTION "Process Details"  // Título da janela
+FONT 8, "Segoe UI"  // Fonte padrão: tamanho 8, família Segoe UI
 BEGIN
     // Controles serão criados em tempo de execução
+    // A interface é construída dinamicamente para exibir informações variáveis sobre o processo
 END
-

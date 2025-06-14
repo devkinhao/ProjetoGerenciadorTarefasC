@@ -1,23 +1,24 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-// Compatibilidade com Windows
-#define _WIN32_IE 0x0700 // Mínimo para IE7, geralmente bom para controles modernos
-#define _WIN32_WINNT 0x0A00 // Windows 10 para os recursos mais recentes
+// Definições de compatibilidade com Windows
+#define _WIN32_IE 0x0700          // Versão mínima do Internet Explorer para compatibilidade
+#define _WIN32_WINNT 0x0A00       // Versão mínima do Windows (Windows 10)
 
-// Interface gráfica
-#define FONT_SIZE 15
-extern int gWindowWidth;
-extern int gWindowHeight;
+// Configurações de interface
+#define FONT_SIZE 15              // Tamanho padrão da fonte
+extern int gWindowWidth;          // Largura da janela principal (definida em main.c)
+extern int gWindowHeight;         // Altura da janela principal (definida em main.c)
 
-// Identificadores de controles
-#define ID_TAB_CONTROL     1001
-#define ID_LIST_VIEW       1002
-#define ID_END_TASK_BUTTON 1003
+// IDs dos controles da interface
+#define ID_TAB_CONTROL     1001   // ID da aba de navegação
+#define ID_LIST_VIEW       1002   // ID da lista de processos
+#define ID_END_TASK_BUTTON 1003   // ID do botão "Encerrar tarefa"
 
-// Tamanho do buffer de CPU
+// Tamanho do buffer para exibição de uso de CPU
 #define CPU_USAGE_BUFFER_SIZE 16
 
+// Inclusão de headers necessários
 #include <winsock2.h>
 #include <windows.h>
 #include <commctrl.h>
@@ -36,10 +37,11 @@ extern int gWindowHeight;
 #include <powrprof.h>
 #include <dxgi.h>
 #include <setupapi.h>
-#include <devguid.h>     // GUID_DEVCLASS_DISPLAY
+#include <devguid.h>     // Para GUIDs de dispositivos
 #include <regstr.h>   
 #include <UxTheme.h>
 
+// Links para as bibliotecas necessárias
 #pragma comment(lib, "ws2_32.lib")
 #pragma comment(lib, "setupapi.lib")
 #pragma comment(lib, "Shlwapi.lib")
@@ -48,11 +50,14 @@ extern int gWindowHeight;
 #pragma comment(lib, "powrprof.lib")
 #pragma comment(lib, "comctl32.lib")
 #pragma comment(lib, "Psapi.lib")
+#pragma comment(lib, "version.lib")
 
 // Variáveis globais compartilhadas
-extern SYSTEM_INFO sysInfo;
-extern int numProcessors;
-extern HWND hTab, hListView, hButtonEndTask, hHardwarePanel;
-extern HFONT hFontTabs, hFontButton;
+extern SYSTEM_INFO sysInfo;       // Informações do sistema
+extern int numProcessors;         // Número de processadores
+extern HWND hTab, hListView, hButtonEndTask, hHardwarePanel;  // Handles dos controles
+extern HFONT hFontTabs, hFontButton;  // Handles das fontes
+extern HBRUSH hbrBackground;      // Pincel para fundo
+extern COLORREF clrBackground;    // Cor de fundo
 
 #endif // CONFIG_H

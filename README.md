@@ -15,4 +15,4 @@
 
  6°: Basta entrar na pasta do projeto utilizando o comando CD: 'cd C:/Users/erick/Desktop/ProjetoGerenciadorTarefasC' (no meu caso estava neste local);
  
- 7°: Executar o comando gcc main.c resources.o ui/ui.c processes/processes.c hardware/hardware.c utils/utils.c -o TaskManager.exe -mwindows -lcomctl32 -lpsapi -lkernel32 -lole32 -loleaut32 -luuid -lversion -lsetupapi -luxtheme
+ 7°: Executar o comando gcc main.c resources.o ui/ui.c processes/processes.c hardware/hardware.c utils/utils.c -o TaskManager.exe -mwindows -lcomctl32 -lpsapi -lkernel32 -lole32 -loleaut32 -luuid -lversion -lsetupapi -luxtheme -liphlpapi

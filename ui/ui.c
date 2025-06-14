@@ -1,35 +1,42 @@
 #include "ui.h"
 #include "../utils/utils.h"
 #include "../hardware/hardware.h"
-#pragma comment(lib, "version.lib")
 
-static HWND* checkboxes = NULL;
+static HWND* checkboxes = NULL;  // Array de checkboxes para diálogo de afinidade
 
+// Centraliza uma janela de diálogo em relação à sua janela pai
 void CenterDialogInParent(HWND hDlg, HWND hwndParent) {
     RECT rcDlg, rcParent;
     int dlgWidth, dlgHeight, parentWidth, parentHeight;
     int newX, newY;
 
+    // Obtém retângulos da janela de diálogo e da janela pai
     GetWindowRect(hDlg, &rcDlg);
     GetWindowRect(hwndParent, &rcParent);
 
+    // Calcula dimensões
     dlgWidth = rcDlg.right - rcDlg.left;
     dlgHeight = rcDlg.bottom - rcDlg.top;
     parentWidth = rcParent.right - rcParent.left;
     parentHeight = rcParent.bottom - rcParent.top;
 
+    // Calcula nova posição para centralizar
     newX = rcParent.left + (parentWidth - dlgWidth) / 2;
     newY = rcParent.top + (parentHeight - dlgHeight) / 2;
 
+    // Reposiciona a janela
     SetWindowPos(hDlg, NULL, newX, newY, 0, 0, SWP_NOZORDER | SWP_NOSIZE);
 }
 
+// Adiciona abas (tabs) à janela principal
 void AddTabs(HWND hwndParent, int width, int height) {
+    // Cria o controle de abas
     hTab = CreateWindowEx(0, WC_TABCONTROL, "",
         WS_CHILD | WS_VISIBLE,
         0, 0, width, height,
         hwndParent, (HMENU)ID_TAB_CONTROL, GetModuleHandle(NULL), NULL);
 
+    // Adiciona as abas "Processes" e "Hardware"
     TCITEM tie;
     tie.mask = TCIF_TEXT;
     tie.pszText = "Processes";
@@ -37,25 +44,31 @@ void AddTabs(HWND hwndParent, int width, int height) {
     tie.pszText = "Hardware";
     TabCtrl_InsertItem(hTab, 1, &tie);
 
+    // Aplica fonte personalizada
     hFontTabs = CreateFontForControl();
     SendMessage(hTab, WM_SETFONT, (WPARAM)hFontTabs, TRUE);
 }
 
+// Adiciona a ListView (lista de processos) à janela principal
 void AddListView(HWND hwndParent, int width, int height) {
+    // Cria o controle ListView
     hListView = CreateWindowEx(0, WC_LISTVIEW, "",
         WS_CHILD | WS_VISIBLE | LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS,
         10, 40, width - 25, height - 121,
         hwndParent, (HMENU)ID_LIST_VIEW, GetModuleHandle(NULL), NULL);
 
+    // Configura estilos estendidos
     ListView_SetExtendedListViewStyle(hListView, LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER);
 
+    // Configura as colunas
     LVCOLUMN lvc;
     lvc.mask = LVCF_TEXT | LVCF_WIDTH;
 
-    // Agora temos 7 colunas
+    // Nomes e larguras das colunas
     char* columns[] = { "Process Name", "User", "PID", "Status", "CPU (%)", "Memory (MB)", "Disk (MB/s)", "Path" };
     int widths[] = { 200, 115, 60, 95, 65, 95, 90, 510 };
 
+    // Insere cada coluna
     for (int i = 0; i < 8; i++) {
         lvc.pszText = columns[i];
         lvc.cx = widths[i];
@@ -63,55 +76,63 @@ void AddListView(HWND hwndParent, int width, int height) {
     }
 }
 
+// Adiciona o rodapé com botão "End Task"
 void AddFooter(HWND hwndParent, int width, int height) {
     const int buttonWidth = 85;
     const int buttonHeight = 22;
 
+    // Posiciona o botão no canto inferior direito
     int x = width - buttonWidth - 15;  
     int y = height - buttonHeight - 40; 
 
+    // Cria o botão "End Task"
     hButtonEndTask = CreateWindowEx(0, "BUTTON", "End Task",
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
         x, y, buttonWidth, buttonHeight,
         hwndParent, (HMENU)ID_END_TASK_BUTTON, GetModuleHandle(NULL), NULL);
     
+    // Aplica fonte e desabilita inicialmente
     hFontButton = CreateFontForControl();
     SendMessage(hButtonEndTask, WM_SETFONT, (WPARAM)hFontButton, TRUE);
     EnableWindow(hButtonEndTask, FALSE);
 }
 
+// Configura um timer para atualizações periódicas
 void SetupTimer(HWND hwnd) {
-    SetTimer(hwnd, 1, 1000, NULL);
+    SetTimer(hwnd, 1, 1000, NULL);  // Timer de 1 segundo
 }
 
+// Manipula mudança de seleção de aba
 void OnTabSelectionChanged(HWND hwndParent, int selectedTab) {
+    // Mostra/oculta controles conforme a aba selecionada
     ShowWindow(hListView, selectedTab == 0 ? SW_SHOW : SW_HIDE);
     ShowWindow(hHardwarePanel, selectedTab == 1 ? SW_SHOW : SW_HIDE);
 
     if (selectedTab == 0) {
         ShowWindow(hButtonEndTask, SW_SHOW);
-
-        // Desabilita o botão ao voltar para a aba de processos
-        EnableWindow(hButtonEndTask, FALSE);
+        EnableWindow(hButtonEndTask, FALSE);  // Desabilita o botão inicialmente
     } else {
         ShowWindow(hButtonEndTask, SW_HIDE);
-        UpdateHardwareInfo();
+        UpdateHardwareInfo();  // Atualiza informações de hardware
     }
 }
 
+// Libera recursos (fontes)
 void CleanupResources() {
     if (hFontTabs) DeleteObject(hFontTabs);
     if (hFontButton) DeleteObject(hFontButton);
 }
 
+// Atualiza estado do botão "End Task" baseado na seleção
 void UpdateEndTaskButtonState() {
     int selectedIndex = ListView_GetNextItem(hListView, -1, LVNI_SELECTED);
-    EnableWindow(hButtonEndTask, selectedIndex != -1);
+    EnableWindow(hButtonEndTask, selectedIndex != -1);  // Habilita se houver seleção
 }
 
-// Função para atualizar o estado do botão OK
+// Atualiza estado do botão OK no diálogo de afinidade
 void UpdateOkButtonState(HWND hDlg, HWND hOk) {
     BOOL enableOk = FALSE;
+    // Verifica se pelo menos uma CPU está selecionada
     for (int i = 0; i < numProcessors; i++) {
         if (SendMessage(checkboxes[i], BM_GETCHECK, 0, 0) == BST_CHECKED) {
             enableOk = TRUE;
@@ -119,11 +140,10 @@ void UpdateOkButtonState(HWND hDlg, HWND hOk) {
         }
     }
 
-    // Habilitar/Desabilitar o botão OK
-    EnableWindow(hOk, enableOk);
+    EnableWindow(hOk, enableOk);  // Habilita/desabilita o botão OK
 }
 
-// Função de Callback para a janela de diálogo (modal)
+// Callback para o diálogo de afinidade de processador
 INT_PTR CALLBACK AffinityDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam) {
     static AffinityDialogParams* params;
     static HWND hAllProcessors;
@@ -133,6 +153,7 @@ INT_PTR CALLBACK AffinityDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPAR
         case WM_INITDIALOG: {
             params = (AffinityDialogParams*)lParam;
             
+            // Obtém máscara de afinidade atual do processo
             DWORD_PTR processAffinity, systemAffinity;
             if (!GetProcessAffinityMask(params->hProcess, &processAffinity, &systemAffinity)) {
                 MessageBox(hDlg, "Error getting affinity", "Error", MB_OK | MB_ICONERROR);
@@ -142,7 +163,7 @@ INT_PTR CALLBACK AffinityDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPAR
 
             HFONT hFont = CreateFontForControl();
 
-            // Obter tamanho da área cliente
+            // Obtém dimensões da área cliente
             RECT rcClient;
             GetClientRect(hDlg, &rcClient);
             int clientWidth = rcClient.right - rcClient.left;
@@ -155,35 +176,35 @@ INT_PTR CALLBACK AffinityDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPAR
                                       10, 10, clientWidth - 20, 30, hDlg, NULL, GetModuleHandle(NULL), NULL);
             SendMessage(hLabel, WM_SETFONT, (WPARAM)hFont, TRUE);
 
-            // "<All Processors>" checkbox
+            // Checkbox "All Processors"
             hAllProcessors = CreateWindow("BUTTON", "<All Processors>", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 
                                          20, 50, 150, 25, hDlg, (HMENU)1000, GetModuleHandle(NULL), NULL);
             SendMessage(hAllProcessors, WM_SETFONT, (WPARAM)hFont, TRUE);
 
-            // Calcular layout das checkboxes
-            int maxHeight = 200;  // Altura máxima desejada para as checkboxes
+            // Configura layout das checkboxes de CPU
+            int maxHeight = 200;  // Altura máxima para as checkboxes
             int checkboxHeight = 20;
             int checkboxWidth = 100;
             int startY = 80;
             int startX = 20;
             int marginRight = 20;
             
-            // Calcular quantas linhas cabem na altura máxima
+            // Calcula quantas linhas cabem
             int rowsPerColumn = (maxHeight - (startY - 50)) / checkboxHeight;
             if (rowsPerColumn < 1) rowsPerColumn = 1;
             
-            // Calcular quantas colunas serão necessárias
+            // Calcula quantas colunas serão necessárias
             int numColumns = (numProcessors + rowsPerColumn - 1) / rowsPerColumn;
             if (numColumns < 1) numColumns = 1;
             
-            // Ajustar largura da checkbox se necessário para caber na janela
+            // Ajusta largura se necessário
             int availableWidth = clientWidth - startX - marginRight;
             if ((numColumns * checkboxWidth) > availableWidth) {
                 checkboxWidth = availableWidth / numColumns;
-                if (checkboxWidth < 60) checkboxWidth = 60; // Largura mínima
+                if (checkboxWidth < 60) checkboxWidth = 60;
             }
 
-            // Checkboxes por CPU
+            // Cria checkboxes para cada CPU
             checkboxes = malloc(sizeof(HWND) * numProcessors);
             BOOL allChecked = TRUE;
             
@@ -202,13 +223,14 @@ INT_PTR CALLBACK AffinityDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPAR
                 
                 SendMessage(checkboxes[i], WM_SETFONT, (WPARAM)hFont, TRUE);
 
+                // Marca se a CPU está na máscara de afinidade
                 if (processAffinity & ((DWORD_PTR)1 << i)) {
                     SendMessage(checkboxes[i], BM_SETCHECK, BST_CHECKED, 0);
                 } else {
                     allChecked = FALSE;
                 }
                 
-                // Avançar para a próxima posição
+                // Avança para próxima posição
                 currentRow++;
                 if (currentRow >= rowsPerColumn) {
                     currentRow = 0;
@@ -216,10 +238,10 @@ INT_PTR CALLBACK AffinityDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPAR
                 }
             }
 
-            // Marcar <All Processors> se todas estão marcadas
+            // Marca "All Processors" se todas CPUs estiverem marcadas
             SendMessage(hAllProcessors, BM_SETCHECK, allChecked ? BST_CHECKED : BST_UNCHECKED, 0);
 
-            // Posicionar botões OK/Cancel
+            // Posiciona botões OK/Cancel
             int buttonWidth = 60;
             int buttonHeight = 25;
             int buttonSpacing = 10;
@@ -244,15 +266,16 @@ INT_PTR CALLBACK AffinityDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPAR
         case WM_COMMAND: {
             int wmId = LOWORD(wParam);
 
-            if (wmId == 1000) { // "<All Processors>"
+            if (wmId == 1000) { // "All Processors" checkbox
+                // Marca/desmarca todas as CPUs
                 BOOL check = (SendMessage(hAllProcessors, BM_GETCHECK, 0, 0) == BST_CHECKED);
                 for (int i = 0; i < numProcessors; i++) {
                     SendMessage(checkboxes[i], BM_SETCHECK, check ? BST_CHECKED : BST_UNCHECKED, 0);
                 }
                 UpdateOkButtonState(hDlg, hOk);
 
-            } else if (wmId >= 1001 && wmId < 1001 + numProcessors) { // CPUs individuais
-                // Atualiza <All Processors> com base nos checkboxes
+            } else if (wmId >= 1001 && wmId < 1001 + numProcessors) { // CPU individual
+                // Atualiza "All Processors" baseado nos checkboxes
                 BOOL allCheckedNow = TRUE;
                 for (int i = 0; i < numProcessors; i++) {
                     if (SendMessage(checkboxes[i], BM_GETCHECK, 0, 0) != BST_CHECKED) {
@@ -264,6 +287,7 @@ INT_PTR CALLBACK AffinityDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPAR
                 UpdateOkButtonState(hDlg, hOk);
 
             } else if (wmId == 9999) { // OK
+                // Cria nova máscara de afinidade baseada nas seleções
                 DWORD_PTR newMask = 0;
                 for (int i = 0; i < numProcessors; i++) {
                     if (SendMessage(checkboxes[i], BM_GETCHECK, 0, 0) == BST_CHECKED) {
@@ -274,6 +298,7 @@ INT_PTR CALLBACK AffinityDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPAR
                 if (newMask == 0) {
                     MessageBox(hDlg, "Select at least one CPU", "Warning", MB_OK | MB_ICONWARNING);
                 } else {
+                    // Aplica nova máscara de afinidade
                     if (!SetProcessAffinityMask(params->hProcess, newMask)) {
                         MessageBox(hDlg, "Error setting affinity", "Error", MB_OK | MB_ICONERROR);
                     } else {
@@ -296,7 +321,7 @@ INT_PTR CALLBACK AffinityDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPAR
     return FALSE;
 }
 
-// Função principal para mostrar a janela de afinidade
+// Mostra o diálogo de afinidade de processador
 void ShowAffinityDialog(HWND hwndParent, HANDLE hProcess, const char* processName) {
     AffinityDialogParams params;
     params.hProcess = hProcess;
@@ -306,20 +331,24 @@ void ShowAffinityDialog(HWND hwndParent, HANDLE hProcess, const char* processNam
     DialogBoxParam(GetModuleHandle(NULL), MAKEINTRESOURCE(101), hwndParent, AffinityDialogProc, (LPARAM)&params);
 }
 
+// Callback para o diálogo de detalhes do processo
 INT_PTR CALLBACK ShowProcessDetailsDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam) {
     static HANDLE hProcess;
     static char processName[MAX_PATH];
     static DWORD pid;
     static HWND hLabelPriority, hLabelMemory, hLabelPrivateMemory, hLabelPageFaults, hLabelCpuTime, hLabelIO, hLabelThreads, hLabelHandles;
 
+    // Atualiza os labels com informações dinâmicas
     void UpdateDynamicLabels() {
         char buf[128];
         PROCESS_MEMORY_COUNTERS_EX pmc;
         
+        // Obtém informações de memória
         if (GetProcessMemoryInfo(hProcess, (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc))) {
             snprintf(buf, sizeof(buf), "Page Faults: %lu", pmc.PageFaultCount);
             SafeSetWindowText(hLabelPageFaults, buf);
 
+            // Obtém e formata prioridade
             DWORD prio = GetPriorityClass(hProcess);
             const char* prioStr;
             switch(prio) {
@@ -334,11 +363,12 @@ INT_PTR CALLBACK ShowProcessDetailsDialogProc(HWND hDlg, UINT message, WPARAM wP
             snprintf(buf, sizeof(buf), "Priority: %s", prioStr);
             SafeSetWindowText(hLabelPriority, buf);
 
+            // Memória Working Set
             double memKB = pmc.WorkingSetSize / 1024.0;
             snprintf(buf, sizeof(buf), "Memory (working set): %.0f K", memKB);
             SafeSetWindowText(hLabelMemory, buf);
 
-            // Calcula Private Working Set real usando QueryWorkingSetEx
+            // Calcula Private Working Set (mais preciso)
             SIZE_T privateWSBytes = 0;
             PSAPI_WORKING_SET_EX_INFORMATION* wsInfo = NULL;
             SIZE_T pageSize;
@@ -377,7 +407,7 @@ INT_PTR CALLBACK ShowProcessDetailsDialogProc(HWND hDlg, UINT message, WPARAM wP
             SafeSetWindowText(hLabelPrivateMemory, buf);
         }
 
-        // CPU Time
+        // Tempo de CPU
         FILETIME ftCreate, ftExit, ftKernel, ftUser;
         if (GetProcessTimes(hProcess, &ftCreate, &ftExit, &ftKernel, &ftUser)) {
             ULONGLONG total = ((ULONGLONG)ftKernel.dwHighDateTime << 32 | ftKernel.dwLowDateTime) +
@@ -422,211 +452,218 @@ INT_PTR CALLBACK ShowProcessDetailsDialogProc(HWND hDlg, UINT message, WPARAM wP
 
     switch (message) {
         case WM_INITDIALOG: {
-        hProcess = ((AffinityDialogParams*)lParam)->hProcess;
-        pid = ((AffinityDialogParams*)lParam)->pid;
-        strncpy(processName, ((AffinityDialogParams*)lParam)->processName, MAX_PATH);
+            // Inicializa variáveis com parâmetros
+            hProcess = ((AffinityDialogParams*)lParam)->hProcess;
+            pid = ((AffinityDialogParams*)lParam)->pid;
+            strncpy(processName, ((AffinityDialogParams*)lParam)->processName, MAX_PATH);
 
-        char description[256] = "Unknown";
-        char company[256] = "Unknown";
-        char timeStr[64] = "Unavailable";
-        char bitnessStr[16] = "Unknown";
+            // Variáveis para informações do processo
+            char description[256] = "Unknown";
+            char company[256] = "Unknown";
+            char timeStr[64] = "Unavailable";
+            char bitnessStr[16] = "Unknown";
 
-        // Descrição e empresa
-        DWORD verHandle = 0;
-        char fullPathForVersionInfo[MAX_PATH] = {0}; // Temporary buffer for path if needed for version info
-        HMODULE hMod;
-        DWORD cbNeeded;
-        if (EnumProcessModules(hProcess, &hMod, sizeof(hMod), &cbNeeded)) {
-            GetModuleFileNameEx(hProcess, hMod, fullPathForVersionInfo, sizeof(fullPathForVersionInfo));
-        }
+            // Obtém informações de versão do arquivo (descrição e empresa)
+            DWORD verHandle = 0;
+            char fullPathForVersionInfo[MAX_PATH] = {0};
+            HMODULE hMod;
+            DWORD cbNeeded;
+            if (EnumProcessModules(hProcess, &hMod, sizeof(hMod), &cbNeeded)) {
+                GetModuleFileNameEx(hProcess, hMod, fullPathForVersionInfo, sizeof(fullPathForVersionInfo));
+            }
 
-        DWORD verSize = GetFileVersionInfoSize(fullPathForVersionInfo, &verHandle);
-        if (verSize > 0) {
-            BYTE* verData = (BYTE*)malloc(verSize);
-            if (GetFileVersionInfo(fullPathForVersionInfo, verHandle, verSize, verData)) {
-                struct LANGANDCODEPAGE {
-                    WORD wLanguage;
-                    WORD wCodePage;
-                } *lpTranslate;
-                UINT cbTranslate;
-                if (VerQueryValue(verData, "\\VarFileInfo\\Translation", (LPVOID*)&lpTranslate, &cbTranslate)) {
-                    char subBlock[128];
-                    UINT size;
-                    char* value;
+            DWORD verSize = GetFileVersionInfoSize(fullPathForVersionInfo, &verHandle);
+            if (verSize > 0) {
+                BYTE* verData = (BYTE*)malloc(verSize);
+                if (GetFileVersionInfo(fullPathForVersionInfo, verHandle, verSize, verData)) {
+                    struct LANGANDCODEPAGE {
+                        WORD wLanguage;
+                        WORD wCodePage;
+                    } *lpTranslate;
+                    UINT cbTranslate;
+                    if (VerQueryValue(verData, "\\VarFileInfo\\Translation", (LPVOID*)&lpTranslate, &cbTranslate)) {
+                        char subBlock[128];
+                        UINT size;
+                        char* value;
 
-                    snprintf(subBlock, sizeof(subBlock),
-                        "\\StringFileInfo\\%04x%04x\\FileDescription",
-                        lpTranslate[0].wLanguage, lpTranslate[0].wCodePage);
-                    if (VerQueryValue(verData, subBlock, (LPVOID*)&value, &size) && size > 0) {
-                        strncpy(description, value, sizeof(description) - 1);
-                    }
+                        // Obtém descrição do arquivo
+                        snprintf(subBlock, sizeof(subBlock),
+                            "\\StringFileInfo\\%04x%04x\\FileDescription",
+                            lpTranslate[0].wLanguage, lpTranslate[0].wCodePage);
+                        if (VerQueryValue(verData, subBlock, (LPVOID*)&value, &size) && size > 0) {
+                            strncpy(description, value, sizeof(description) - 1);
+                        }
 
-                    snprintf(subBlock, sizeof(subBlock),
-                        "\\StringFileInfo\\%04x%04x\\CompanyName",
-                        lpTranslate[0].wLanguage, lpTranslate[0].wCodePage);
-                    if (VerQueryValue(verData, subBlock, (LPVOID*)&value, &size) && size > 0) {
-                        strncpy(company, value, sizeof(company) - 1);
+                        // Obtém nome da empresa
+                        snprintf(subBlock, sizeof(subBlock),
+                            "\\StringFileInfo\\%04x%04x\\CompanyName",
+                            lpTranslate[0].wLanguage, lpTranslate[0].wCodePage);
+                        if (VerQueryValue(verData, subBlock, (LPVOID*)&value, &size) && size > 0) {
+                            strncpy(company, value, sizeof(company) - 1);
+                        }
                     }
                 }
+                free(verData);
             }
-            free(verData);
-        }
 
-        // Tempo de início do processo
-        FILETIME ftCreate, ftExit, ftKernel, ftUser;
-        SYSTEMTIME stUTC, stLocal;
-        if (GetProcessTimes(hProcess, &ftCreate, &ftExit, &ftKernel, &ftUser)) {
-            FileTimeToSystemTime(&ftCreate, &stUTC);
-            SystemTimeToTzSpecificLocalTime(NULL, &stUTC, &stLocal);
-            snprintf(timeStr, sizeof(timeStr), "%02d/%02d/%04d %02d:%02d:%02d",
-                stLocal.wDay, stLocal.wMonth, stLocal.wYear,
-                stLocal.wHour, stLocal.wMinute, stLocal.wSecond);
-        }
+            // Obtém tempo de início do processo
+            FILETIME ftCreate, ftExit, ftKernel, ftUser;
+            SYSTEMTIME stUTC, stLocal;
+            if (GetProcessTimes(hProcess, &ftCreate, &ftExit, &ftKernel, &ftUser)) {
+                FileTimeToSystemTime(&ftCreate, &stUTC);
+                SystemTimeToTzSpecificLocalTime(NULL, &stUTC, &stLocal);
+                snprintf(timeStr, sizeof(timeStr), "%02d/%02d/%04d %02d:%02d:%02d",
+                    stLocal.wDay, stLocal.wMonth, stLocal.wYear,
+                    stLocal.wHour, stLocal.wMinute, stLocal.wSecond);
+            }
 
-        // Bitness (32/64-bit)
-        BOOL isTargetWow64 = FALSE;
-        IsWow64Process(hProcess, &isTargetWow64);
-    #if defined(_WIN64)
-        strcpy(bitnessStr, isTargetWow64 ? "32-bit" : "64-bit");
-    #else
-        BOOL isHostWow64 = FALSE;
-        IsWow64Process(GetCurrentProcess(), &isHostWow64);
-        strcpy(bitnessStr, (isHostWow64 && !isTargetWow64) ? "64-bit" : "32-bit");
-    #endif
+            // Determina se o processo é 32 ou 64-bit
+            BOOL isTargetWow64 = FALSE;
+            IsWow64Process(hProcess, &isTargetWow64);
+        #if defined(_WIN64)
+            strcpy(bitnessStr, isTargetWow64 ? "32-bit" : "64-bit");
+        #else
+            BOOL isHostWow64 = FALSE;
+            IsWow64Process(GetCurrentProcess(), &isHostWow64);
+            strcpy(bitnessStr, (isHostWow64 && !isTargetWow64) ? "64-bit" : "32-bit");
+        #endif
 
-        // Layout da janela
-        RECT rcClient;
-        GetClientRect(hDlg, &rcClient);
-        int clientWidth = rcClient.right - rcClient.left;
-        int margin = 10;
-        int groupPadding = 10;
-        int y = margin;
+            // Configura layout da janela
+            RECT rcClient;
+            GetClientRect(hDlg, &rcClient);
+            int clientWidth = rcClient.right - rcClient.left;
+            int margin = 10;
+            int groupPadding = 10;
+            int y = margin;
 
-        HFONT hFont = CreateFontForControl();
-        char buffer[512];
+            HFONT hFont = CreateFontForControl();
+            char buffer[512];
 
-        //
-        // 🔷 Group Box 1 – Informações estáticas
-        //
-        int staticGroupHeight = 22 * 6 + 20; // 6 linhas + margem inferior
-        HWND hGroupStatic = CreateWindow("BUTTON", "Static Information", WS_CHILD | WS_VISIBLE | BS_GROUPBOX,
-            margin, y, clientWidth - 2 * margin, staticGroupHeight, hDlg, NULL, GetModuleHandle(NULL), NULL);
-        SendMessage(hGroupStatic, WM_SETFONT, (WPARAM)hFont, TRUE);
-        y += 20; // espaço para título do group box
+            // Group Box 1 – Informações estáticas
+            int staticGroupHeight = 22 * 6 + 20; // 6 linhas + margem
+            HWND hGroupStatic = CreateWindow("BUTTON", "Static Information", WS_CHILD | WS_VISIBLE | BS_GROUPBOX,
+                margin, y, clientWidth - 2 * margin, staticGroupHeight, hDlg, NULL, GetModuleHandle(NULL), NULL);
+            SendMessage(hGroupStatic, WM_SETFONT, (WPARAM)hFont, TRUE);
+            y += 20; // espaço para título
 
-        int x = margin + groupPadding;
-        int labelWidth = clientWidth - 2 * (margin + groupPadding);
+            int x = margin + groupPadding;
+            int labelWidth = clientWidth - 2 * (margin + groupPadding);
 
-        snprintf(buffer, sizeof(buffer), "Process: %s", processName);
-        HWND hStaticName = CreateWindow("STATIC", buffer, WS_CHILD | WS_VISIBLE | SS_LEFT | SS_ENDELLIPSIS,
-            x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL);
-        SendMessage(hStaticName, WM_SETFONT, (WPARAM)hFont, TRUE); y += 22;
+            // Nome do processo
+            snprintf(buffer, sizeof(buffer), "Process: %s", processName);
+            HWND hStaticName = CreateWindow("STATIC", buffer, WS_CHILD | WS_VISIBLE | SS_LEFT | SS_ENDELLIPSIS,
+                x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL);
+            SendMessage(hStaticName, WM_SETFONT, (WPARAM)hFont, TRUE); y += 22;
 
-        snprintf(buffer, sizeof(buffer), "PID: %lu", pid);
-        HWND hStaticPID = CreateWindow("STATIC", buffer, WS_CHILD | WS_VISIBLE | SS_LEFT,
-            x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL);
-        SendMessage(hStaticPID, WM_SETFONT, (WPARAM)hFont, TRUE); y += 22;
+            // PID
+            snprintf(buffer, sizeof(buffer), "PID: %lu", pid);
+            HWND hStaticPID = CreateWindow("STATIC", buffer, WS_CHILD | WS_VISIBLE | SS_LEFT,
+                x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL);
+            SendMessage(hStaticPID, WM_SETFONT, (WPARAM)hFont, TRUE); y += 22;
 
-        snprintf(buffer, sizeof(buffer), "Description: %s", description);
-        HWND hStaticDesc = CreateWindow("STATIC", buffer, WS_CHILD | WS_VISIBLE | SS_LEFT | SS_ENDELLIPSIS,
-            x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL);
-        SendMessage(hStaticDesc, WM_SETFONT, (WPARAM)hFont, TRUE); y += 22;
+            // Descrição
+            snprintf(buffer, sizeof(buffer), "Description: %s", description);
+            HWND hStaticDesc = CreateWindow("STATIC", buffer, WS_CHILD | WS_VISIBLE | SS_LEFT | SS_ENDELLIPSIS,
+                x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL);
+            SendMessage(hStaticDesc, WM_SETFONT, (WPARAM)hFont, TRUE); y += 22;
 
-        snprintf(buffer, sizeof(buffer), "Company: %s", company);
-        HWND hStaticComp = CreateWindow("STATIC", buffer, WS_CHILD | WS_VISIBLE | SS_LEFT | SS_ENDELLIPSIS,
-            x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL);
-        SendMessage(hStaticComp, WM_SETFONT, (WPARAM)hFont, TRUE); y += 22;
+            // Empresa
+            snprintf(buffer, sizeof(buffer), "Company: %s", company);
+            HWND hStaticComp = CreateWindow("STATIC", buffer, WS_CHILD | WS_VISIBLE | SS_LEFT | SS_ENDELLIPSIS,
+                x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL);
+            SendMessage(hStaticComp, WM_SETFONT, (WPARAM)hFont, TRUE); y += 22;
 
-        snprintf(buffer, sizeof(buffer), "Start Time: %s", timeStr);
-        HWND hStaticStart = CreateWindow("STATIC", buffer, WS_CHILD | WS_VISIBLE | SS_LEFT,
-            x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL);
-        SendMessage(hStaticStart, WM_SETFONT, (WPARAM)hFont, TRUE); y += 22;
+            // Tempo de início
+            snprintf(buffer, sizeof(buffer), "Start Time: %s", timeStr);
+            HWND hStaticStart = CreateWindow("STATIC", buffer, WS_CHILD | WS_VISIBLE | SS_LEFT,
+                x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL);
+            SendMessage(hStaticStart, WM_SETFONT, (WPARAM)hFont, TRUE); y += 22;
 
-        snprintf(buffer, sizeof(buffer), "Bitness: %s", bitnessStr);
-        HWND hStaticBitness = CreateWindow("STATIC", buffer, WS_CHILD | WS_VISIBLE | SS_LEFT,
-            x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL);
-        SendMessage(hStaticBitness, WM_SETFONT, (WPARAM)hFont, TRUE); y += 20;
+            // Arquitetura (32/64-bit)
+            snprintf(buffer, sizeof(buffer), "Bitness: %s", bitnessStr);
+            HWND hStaticBitness = CreateWindow("STATIC", buffer, WS_CHILD | WS_VISIBLE | SS_LEFT,
+                x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL);
+            SendMessage(hStaticBitness, WM_SETFONT, (WPARAM)hFont, TRUE); y += 20;
 
-        //
-        // 🟩 Group Box 2 – Informações dinâmicas
-        //
-        int dynamicGroupTop = y + 30;
-        int dynamicGroupHeight = 22 * 8 + 20;
+            // Group Box 2 – Informações dinâmicas
+            int dynamicGroupTop = y + 30;
+            int dynamicGroupHeight = 22 * 8 + 20;
 
-        HWND hGroupDynamic = CreateWindow("BUTTON", "Live Metrics", WS_CHILD | WS_VISIBLE | BS_GROUPBOX,
-            margin, dynamicGroupTop - 20, clientWidth - 2 * margin, dynamicGroupHeight, hDlg, NULL, GetModuleHandle(NULL), NULL);
-        SendMessage(hGroupDynamic, WM_SETFONT, (WPARAM)hFont, TRUE);
+            HWND hGroupDynamic = CreateWindow("BUTTON", "Live Metrics", WS_CHILD | WS_VISIBLE | BS_GROUPBOX,
+                margin, dynamicGroupTop - 20, clientWidth - 2 * margin, dynamicGroupHeight, hDlg, NULL, GetModuleHandle(NULL), NULL);
+            SendMessage(hGroupDynamic, WM_SETFONT, (WPARAM)hFont, TRUE);
 
-        x = margin + groupPadding;
-        y = dynamicGroupTop;
+            x = margin + groupPadding;
+            y = dynamicGroupTop;
 
-        hLabelPriority = CreateWindow("STATIC", "", WS_CHILD | WS_VISIBLE | SS_LEFT,
-        x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL); y += 22; 
-        hLabelMemory = CreateWindow("STATIC", "", WS_CHILD | WS_VISIBLE | SS_LEFT,
-            x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL); y += 22;
-        hLabelPrivateMemory = CreateWindow("STATIC", "", WS_CHILD | WS_VISIBLE | SS_LEFT,
-        x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL); y += 22;
-        hLabelPageFaults = CreateWindow("STATIC", "", WS_CHILD | WS_VISIBLE | SS_LEFT,
-        x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL); y += 22; 
-        hLabelCpuTime = CreateWindow("STATIC", "", WS_CHILD | WS_VISIBLE | SS_LEFT,
-            x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL); y += 22;
-        hLabelIO = CreateWindow("STATIC", "", WS_CHILD | WS_VISIBLE | SS_LEFT,
-            x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL); y += 22;
-        hLabelThreads = CreateWindow("STATIC", "", WS_CHILD | WS_VISIBLE | SS_LEFT,
-            x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL); y += 22;
-        hLabelHandles = CreateWindow("STATIC", "", WS_CHILD | WS_VISIBLE | SS_LEFT,
-            x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL); y += 22;
+            // Cria labels para métricas dinâmicas
+            hLabelPriority = CreateWindow("STATIC", "", WS_CHILD | WS_VISIBLE | SS_LEFT,
+                x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL); y += 22; 
+            hLabelMemory = CreateWindow("STATIC", "", WS_CHILD | WS_VISIBLE | SS_LEFT,
+                x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL); y += 22;
+            hLabelPrivateMemory = CreateWindow("STATIC", "", WS_CHILD | WS_VISIBLE | SS_LEFT,
+                x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL); y += 22;
+            hLabelPageFaults = CreateWindow("STATIC", "", WS_CHILD | WS_VISIBLE | SS_LEFT,
+                x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL); y += 22; 
+            hLabelCpuTime = CreateWindow("STATIC", "", WS_CHILD | WS_VISIBLE | SS_LEFT,
+                x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL); y += 22;
+            hLabelIO = CreateWindow("STATIC", "", WS_CHILD | WS_VISIBLE | SS_LEFT,
+                x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL); y += 22;
+            hLabelThreads = CreateWindow("STATIC", "", WS_CHILD | WS_VISIBLE | SS_LEFT,
+                x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL); y += 22;
+            hLabelHandles = CreateWindow("STATIC", "", WS_CHILD | WS_VISIBLE | SS_LEFT,
+                x, y, labelWidth, 20, hDlg, NULL, GetModuleHandle(NULL), NULL); y += 22;
 
-        SendMessage(hLabelPriority, WM_SETFONT, (WPARAM)hFont, TRUE);
-        SendMessage(hLabelMemory, WM_SETFONT, (WPARAM)hFont, TRUE);
-        SendMessage(hLabelPrivateMemory, WM_SETFONT, (WPARAM)hFont, TRUE);
-        SendMessage(hLabelPageFaults, WM_SETFONT, (WPARAM)hFont, TRUE);
-        SendMessage(hLabelCpuTime, WM_SETFONT, (WPARAM)hFont, TRUE);
-        SendMessage(hLabelIO, WM_SETFONT, (WPARAM)hFont, TRUE);
-        SendMessage(hLabelThreads, WM_SETFONT, (WPARAM)hFont, TRUE);
-        SendMessage(hLabelHandles, WM_SETFONT, (WPARAM)hFont, TRUE);
+            // Aplica fonte aos labels
+            SendMessage(hLabelPriority, WM_SETFONT, (WPARAM)hFont, TRUE);
+            SendMessage(hLabelMemory, WM_SETFONT, (WPARAM)hFont, TRUE);
+            SendMessage(hLabelPrivateMemory, WM_SETFONT, (WPARAM)hFont, TRUE);
+            SendMessage(hLabelPageFaults, WM_SETFONT, (WPARAM)hFont, TRUE);
+            SendMessage(hLabelCpuTime, WM_SETFONT, (WPARAM)hFont, TRUE);
+            SendMessage(hLabelIO, WM_SETFONT, (WPARAM)hFont, TRUE);
+            SendMessage(hLabelThreads, WM_SETFONT, (WPARAM)hFont, TRUE);
+            SendMessage(hLabelHandles, WM_SETFONT, (WPARAM)hFont, TRUE);
 
-        //
-        // Botão "Close"
-        //
-        int buttonWidth = 80, buttonHeight = 25;
-        int buttonX = (clientWidth - buttonWidth) / 2;
-        int buttonY = rcClient.bottom - buttonHeight - 10;
+            // Botão "Close"
+            int buttonWidth = 80, buttonHeight = 25;
+            int buttonX = (clientWidth - buttonWidth) / 2;
+            int buttonY = rcClient.bottom - buttonHeight - 10;
 
-        HWND hClose = CreateWindow("BUTTON", "Close", WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON,
-            buttonX, buttonY, buttonWidth, buttonHeight, hDlg, (HMENU)IDOK, GetModuleHandle(NULL), NULL);
-        SendMessage(hClose, WM_SETFONT, (WPARAM)hFont, TRUE);
+            HWND hClose = CreateWindow("BUTTON", "Close", WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON,
+                buttonX, buttonY, buttonWidth, buttonHeight, hDlg, (HMENU)IDOK, GetModuleHandle(NULL), NULL);
+            SendMessage(hClose, WM_SETFONT, (WPARAM)hFont, TRUE);
 
-        UpdateDynamicLabels();
-        CenterDialogInParent(hDlg, GetParent(hDlg));
-        SetTimer(hDlg, 1, 1000, NULL);
+            // Atualiza labels e configura timer
+            UpdateDynamicLabels();
+            CenterDialogInParent(hDlg, GetParent(hDlg));
+            SetTimer(hDlg, 1, 1000, NULL);
 
-        return TRUE;
-
-    }
-
-    case WM_TIMER: {
-        UpdateDynamicLabels();
-        break;
-    }
-
-    case WM_COMMAND:
-        if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL) {
-            KillTimer(hDlg, 1);
-            EndDialog(hDlg, 0);
             return TRUE;
         }
-        break;
 
-    case WM_CLOSE:
-        KillTimer(hDlg, 1);
-        EndDialog(hDlg, 0);
-        break;
+        case WM_TIMER: {
+            UpdateDynamicLabels();  // Atualiza métricas a cada segundo
+            break;
+        }
+
+        case WM_COMMAND:
+            if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL) {
+                KillTimer(hDlg, 1);
+                EndDialog(hDlg, 0);
+                return TRUE;
+            }
+            break;
+
+        case WM_CLOSE:
+            KillTimer(hDlg, 1);
+            EndDialog(hDlg, 0);
+            break;
     }
 
     return FALSE;
 }
 
+// Mostra o diálogo de detalhes do processo
 void ShowProcessDetailsDialog(HWND hwndParent, HANDLE hProcess, const char* processName, DWORD pid) {
     AffinityDialogParams params;
     params.hProcess = hProcess;
@@ -635,10 +672,13 @@ void ShowProcessDetailsDialog(HWND hwndParent, HANDLE hProcess, const char* proc
     DialogBoxParam(GetModuleHandle(NULL), MAKEINTRESOURCE(102), hwndParent, ShowProcessDetailsDialogProc, (LPARAM)&params);
 }
 
+// Mostra o menu de contexto para um processo selecionado
 void ShowContextMenu(HWND hwndListView, HWND hwndParent, POINT pt) {
+    // Obtém o índice do item selecionado
     int selectedIndex = ListView_GetNextItem(hwndListView, -1, LVNI_SELECTED);
     if (selectedIndex == -1) return;
 
+    // Obtém PID do processo selecionado
     char pidText[16];
     LVITEM item = {0};
     item.iSubItem = 2;
@@ -655,7 +695,7 @@ void ShowContextMenu(HWND hwndListView, HWND hwndParent, POINT pt) {
         return;
     }
 
-    // Obter o nome do processo (subitem 0, por exemplo)
+    // Obtém nome do processo
     char processName[MAX_PATH] = {0};
     LVITEM nameItem = {0};
     nameItem.iSubItem = 0;
@@ -665,11 +705,14 @@ void ShowContextMenu(HWND hwndListView, HWND hwndParent, POINT pt) {
     nameItem.cchTextMax = sizeof(processName);
     ListView_GetItem(hwndListView, &nameItem);
 
+    // Obtém prioridade atual do processo
     DWORD currentPriority = GetPriorityClass(hProcess);
 
+    // Cria menu popup
     HMENU hMenu = CreatePopupMenu();
     HMENU hPriorityMenu = CreatePopupMenu();
 
+    // Adiciona itens de prioridade (com marcação na prioridade atual)
     AppendMenu(hPriorityMenu, MF_STRING | (currentPriority == REALTIME_PRIORITY_CLASS ? MF_CHECKED : 0), 101, "Realtime");
     AppendMenu(hPriorityMenu, MF_STRING | (currentPriority == HIGH_PRIORITY_CLASS ? MF_CHECKED : 0), 102, "High");
     AppendMenu(hPriorityMenu, MF_STRING | (currentPriority == ABOVE_NORMAL_PRIORITY_CLASS ? MF_CHECKED : 0), 103, "Above Normal");
@@ -677,13 +720,17 @@ void ShowContextMenu(HWND hwndListView, HWND hwndParent, POINT pt) {
     AppendMenu(hPriorityMenu, MF_STRING | (currentPriority == BELOW_NORMAL_PRIORITY_CLASS ? MF_CHECKED : 0), 105, "Below Normal");
     AppendMenu(hPriorityMenu, MF_STRING | (currentPriority == IDLE_PRIORITY_CLASS ? MF_CHECKED : 0), 106, "Low");
 
+    // Adiciona submenu de prioridade e outros itens
     AppendMenu(hMenu, MF_POPUP, (UINT_PTR)hPriorityMenu, "Set priority");
     AppendMenu(hMenu, MF_STRING, 2, "Set affinity");
     AppendMenu(hMenu, MF_STRING, 3, "More details");
 
+    // Mostra o menu e obtém seleção
     int cmd = TrackPopupMenu(hMenu, TPM_RETURNCMD | TPM_NONOTIFY, pt.x, pt.y, 0, hwndParent, NULL);
 
+    // Processa seleção do menu
     if (cmd >= 101 && cmd <= 106) {
+        // Define nova prioridade
         DWORD priority;
         switch (cmd) {
             case 101: priority = REALTIME_PRIORITY_CLASS; break;
@@ -700,12 +747,15 @@ void ShowContextMenu(HWND hwndListView, HWND hwndParent, POINT pt) {
             MessageBox(hwndParent, "Failed to set priority", "Error", MB_OK | MB_ICONERROR);
         }
     } else if (cmd == 2) {
+        // Mostra diálogo de afinidade
         ShowAffinityDialog(hwndParent, hProcess, processName);
     }
     else if (cmd == 3) {
-    ShowProcessDetailsDialog(hwndParent, hProcess, processName, pid);
-}
+        // Mostra diálogo de detalhes
+        ShowProcessDetailsDialog(hwndParent, hProcess, processName, pid);
+    }
 
+    // Limpa recursos
     DestroyMenu(hPriorityMenu);
     DestroyMenu(hMenu);
     CloseHandle(hProcess);
